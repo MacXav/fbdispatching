@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import MainLayout from '@/components/MainLayout';
 import Header from '@/components/Header';
 import {
   AlertTriangle,
   ArrowRight,
   Check,
+  ChevronDown,
   Lock,
   MapPinned,
   RefreshCw,
+  Route,
   Shuffle,
   Truck as TruckIcon,
 } from 'lucide-react';
@@ -91,6 +93,19 @@ interface GeocodeDeliveriesResponse {
   error?: string;
 }
 
+interface GoogleTruckRouteEstimate {
+  distanceKm: number;
+  distanceText: string;
+  durationText: string;
+  staticDurationText: string;
+  orderedStops: {
+    shipmentId: string;
+    label: string;
+    latitude: number;
+    longitude: number;
+  }[];
+}
+
 export default function RoutingPlannerPage() {
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -105,6 +120,13 @@ export default function RoutingPlannerPage() {
   const [latestGeocodeLogs, setLatestGeocodeLogs] = useState<
     GeocodeDeliveriesResponse['logs']
   >([]);
+
+  const [googleRouteEstimates, setGoogleRouteEstimates] = useState<
+    Record<string, GoogleTruckRouteEstimate>
+  >({});
+  const [loadingGoogleRouteTruckId, setLoadingGoogleRouteTruckId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     loadPlannerData();
@@ -129,6 +151,8 @@ export default function RoutingPlannerPage() {
       setShipments(data.shipments || []);
       setCompanies(data.companies || []);
       setPlannerResult(null);
+      setGoogleRouteEstimates({});
+      setLoadingGoogleRouteTruckId(null);
     } catch (error) {
       console.error('Error loading routing planner:', error);
       alert(
@@ -187,6 +211,8 @@ export default function RoutingPlannerPage() {
   const analyzeLayout = () => {
     try {
       setAnalyzing(true);
+      setGoogleRouteEstimates({});
+      setLoadingGoogleRouteTruckId(null);
 
       if (activeAssignedFreight.length === 0) {
         alert('There is no assigned freight to analyze yet.');
@@ -258,6 +284,60 @@ export default function RoutingPlannerPage() {
     }
   };
 
+  const calculateGoogleRouteForTruck = async (plan: TruckPlan) => {
+    try {
+      if (plan.suggestedStops.length < 2) {
+        alert('This truck needs at least two GPS-ready stops to calculate a Google route.');
+        return;
+      }
+
+      if (plan.suggestedStops.length > 27) {
+        alert(
+          'This truck has too many stops for this route calculation. Limit is 27 stops: origin, 25 stops, and destination.'
+        );
+        return;
+      }
+
+      setLoadingGoogleRouteTruckId(plan.truck.id);
+
+      const response = await fetch('/api/google-truck-route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+        body: JSON.stringify({
+          stops: plan.suggestedStops.map((stop) => ({
+            shipmentId: stop.shipment.id,
+            label: getDeliveryDisplayName(stop.shipment),
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not calculate Google route.');
+      }
+
+      setGoogleRouteEstimates((current) => ({
+        ...current,
+        [plan.truck.id]: data as GoogleTruckRouteEstimate,
+      }));
+    } catch (error) {
+      console.error('Google route error:', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Could not calculate Google route.'
+      );
+    } finally {
+      setLoadingGoogleRouteTruckId(null);
+    }
+  };
+
   const applySuggestedLayout = async () => {
     if (!plannerResult) {
       return;
@@ -322,11 +402,12 @@ export default function RoutingPlannerPage() {
       <MainLayout>
         <Header
           title="Routing Planner"
-          subtitle="Analyze assigned freight and suggest cross-dock moves"
+          subtitle="Clean truck grouping for Freightboy Warehouse, Buffalo, and regular deliveries"
         />
 
-        <div className="card py-12 text-center">
-          <p className="text-slate-400">Loading routing planner...</p>
+        <div className="rounded-2xl border border-dark-border bg-dark-card p-10 text-center">
+          <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-300" />
+          <p className="text-sm text-slate-300">Loading routing planner...</p>
         </div>
       </MainLayout>
     );
@@ -336,268 +417,242 @@ export default function RoutingPlannerPage() {
     <MainLayout>
       <Header
         title="Routing Planner"
-        subtitle="Compare every truck, every delivery location, and suggest a better layout"
+        subtitle="Build cleaner truck routes with fewer mixed loads and clearer dock moves"
       />
 
-      <div className="mb-6 rounded-xl border border-blue-900 bg-blue-950/40 p-4">
-        <div className="flex items-start gap-3">
-          <MapPinned className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-300" />
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-dark-border bg-dark-card p-5 shadow-sm">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-blue-950 p-3">
+                  <MapPinned className="h-6 w-6 text-blue-300" />
+                </div>
 
-          <div>
-            <p className="font-semibold text-blue-100">
-              Route bucket mode is active.
-            </p>
+                <div>
+                  <h2 className="text-xl font-black text-white">
+                    Route bucket planner
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Freightboy Warehouse stays together. Buffalo stays together. Everything else fills in after.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            <p className="mt-1 text-sm leading-6 text-blue-200/80">
-              The planner now tries to keep Freightboy Warehouse deliveries together and Buffalo deliveries together on their own truck when capacity allows.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-          <SummaryBox
-            label="Assigned freight"
-            value={String(activeAssignedFreight.length)}
-          />
-
-          <SummaryBox
-            label="With GPS"
-            value={String(assignedWithGpsCount)}
-          />
-
-          <SummaryBox
-            label="Need GPS"
-            value={String(shipmentsNeedingDeliveryGps.length)}
-          />
-
-          <SummaryBox
-            label="Active trucks"
-            value={String(activeTrucks.length)}
-          />
-
-          <SummaryBox
-            label="Companies GPS"
-            value={String(
-              companies.filter((company) => hasCoordinates(company)).length
-            )}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={loadPlannerData}
-            className="btn-secondary flex items-center justify-center gap-2"
-            disabled={loading || analyzing || applying || geocodingDeliveries}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={geocodeMissingDeliveryAddresses}
-            className="btn-secondary flex items-center justify-center gap-2"
-            disabled={loading || analyzing || applying || geocodingDeliveries}
-          >
-            <MapPinned className="h-4 w-4" />
-            {geocodingDeliveries
-              ? 'Geocoding...'
-              : `Geocode Missing Deliveries (${shipmentsNeedingDeliveryGps.length})`}
-          </button>
-
-          <button
-            type="button"
-            onClick={analyzeLayout}
-            className="btn-primary flex items-center justify-center gap-2"
-            disabled={loading || analyzing || applying || geocodingDeliveries}
-          >
-            <Shuffle className="h-4 w-4" />
-            {analyzing ? 'Analyzing...' : 'Analyze Layout'}
-          </button>
-        </div>
-      </div>
-
-      {latestGeocodeLogs.length > 0 && (
-        <div className="mb-6 rounded-xl border border-dark-border bg-dark-card p-4">
-          <h2 className="mb-3 text-lg font-bold text-white">
-            Latest Geocode Results
-          </h2>
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {latestGeocodeLogs.slice(0, 12).map((log, index) => (
-              <div
-                key={`${log.shipmentId}-${log.status}-${index}`}
-                className={`rounded-lg border p-3 ${
-                  log.status === 'success'
-                    ? 'border-green-900 bg-green-950/30'
-                    : log.status === 'skipped'
-                      ? 'border-yellow-900 bg-yellow-950/30'
-                      : 'border-red-900 bg-red-950/30'
-                }`}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={loadPlannerData}
+                className="btn-secondary flex items-center justify-center gap-2"
+                disabled={loading || analyzing || applying || geocodingDeliveries}
               >
-                <p className="font-semibold text-white">{log.label}</p>
-                <p className="mt-1 text-xs text-slate-400">{log.address}</p>
-                <p className="mt-1 text-xs text-slate-300">{log.message}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
 
-      {!plannerResult ? (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="card xl:col-span-2">
-            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-white">
-              <TruckIcon className="h-5 w-5 text-blue-400" />
-              Current Truck Layout
-            </h2>
+              <button
+                type="button"
+                onClick={geocodeMissingDeliveryAddresses}
+                className="btn-secondary flex items-center justify-center gap-2"
+                disabled={
+                  loading ||
+                  analyzing ||
+                  applying ||
+                  geocodingDeliveries ||
+                  shipmentsNeedingDeliveryGps.length === 0
+                }
+              >
+                <MapPinned className="h-4 w-4" />
+                {geocodingDeliveries
+                  ? 'Geocoding...'
+                  : `Fix GPS (${shipmentsNeedingDeliveryGps.length})`}
+              </button>
 
-            {activeTrucks.length === 0 ? (
-              <p className="text-slate-400">
-                No active assigned trucks yet. Assign freight on the truck board first.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {activeTrucks.map((truck) => {
-                  const truckFreight = activeAssignedFreight.filter(
-                    (shipment) => shipment.assigned_truck_id === truck.id
-                  );
-
-                  const totalSkids = truckFreight.reduce(
-                    (sum, shipment) => sum + Number(shipment.number_of_skids || 0),
-                    0
-                  );
-
-                  const totalWeight = truckFreight.reduce(
-                    (sum, shipment) =>
-                      sum + Number(shipment.weight_lbs || shipment.weight_kg || 0),
-                    0
-                  );
-
-                  return (
-                    <div
-                      key={truck.id}
-                      className="rounded-xl border border-dark-border bg-slate-900 p-4"
-                    >
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-bold text-white">
-                            {truck.truck_number}
-                          </p>
-
-                          <p className="text-sm text-slate-400">
-                            {truck.driver_name || 'No driver'}
-                          </p>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-blue-300">
-                            {truckFreight.length} stop(s)
-                          </p>
-
-                          <p className="text-xs text-slate-500">
-                            {totalSkids} skids • {totalWeight.toLocaleString()} lbs
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        {truckFreight.map((shipment) => {
-                          const locationSource = getShipmentLocationSource(
-                            shipment,
-                            companies
-                          );
-
-                          const bucket = getRouteBucket(shipment);
-
-                          return (
-                            <div
-                              key={shipment.id}
-                              className="rounded-lg border border-dark-border bg-slate-950 p-3"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate font-semibold text-white">
-                                    {getPickupDisplayName(shipment)}
-                                  </p>
-
-                                  <p className="mt-1 text-xs text-slate-300">
-                                    Pickup: {displayLocation(
-                                      shipment.pickup_address,
-                                      shipment.pickup_city
-                                    )}
-                                  </p>
-
-                                  <p className="mt-1 text-xs text-blue-300">
-                                    Delivers to: {getDeliveryDisplayName(shipment)}
-                                  </p>
-
-                                  <p className="mt-1 text-xs text-slate-500">
-                                    {displayLocation(
-                                      shipment.delivery_address,
-                                      shipment.delivery_city
-                                    )}
-                                  </p>
-
-                                  <p className="mt-1 text-xs font-semibold text-purple-300">
-                                    Bucket: {bucket.label}
-                                  </p>
-                                </div>
-
-                                {locationSource ? (
-                                  <span className="rounded bg-green-900 px-2 py-1 text-[10px] font-black text-green-100">
-                                    GPS
-                                  </span>
-                                ) : (
-                                  <span className="rounded bg-red-900 px-2 py-1 text-[10px] font-black text-red-100">
-                                    NO GPS
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-white">
-              <AlertTriangle className="h-5 w-5 text-yellow-400" />
-              Routing Rules
-            </h2>
-
-            <div className="space-y-3 text-sm leading-6 text-slate-400">
-              <p>
-                Freightboy Warehouse deliveries are grouped together first.
-              </p>
-
-              <p>
-                Buffalo deliveries are grouped together first and kept separate when possible.
-              </p>
-
-              <p>
-                Other freight is placed after those route buckets, avoiding those dedicated trucks when possible.
-              </p>
+              <button
+                type="button"
+                onClick={analyzeLayout}
+                className="btn-primary flex items-center justify-center gap-2"
+                disabled={loading || analyzing || applying || geocodingDeliveries}
+              >
+                <Shuffle className="h-4 w-4" />
+                {analyzing ? 'Analyzing...' : 'Analyze Routes'}
+              </button>
             </div>
           </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+            <SummaryBox label="Freight" value={String(activeAssignedFreight.length)} />
+            <SummaryBox label="GPS Ready" value={String(assignedWithGpsCount)} />
+            <SummaryBox label="Need GPS" value={String(shipmentsNeedingDeliveryGps.length)} />
+            <SummaryBox label="Trucks" value={String(activeTrucks.length)} />
+            <SummaryBox
+              label="Companies GPS"
+              value={String(companies.filter((company) => hasCoordinates(company)).length)}
+            />
+          </div>
         </div>
-      ) : (
-        <PlannerResults
-          result={plannerResult}
-          applying={applying}
-          onApply={applySuggestedLayout}
-          onReAnalyze={analyzeLayout}
-        />
-      )}
+
+        {latestGeocodeLogs.length > 0 && (
+          <GeocodeSummary logs={latestGeocodeLogs} />
+        )}
+
+        {!plannerResult ? (
+          <CurrentLayout
+            activeTrucks={activeTrucks}
+            activeAssignedFreight={activeAssignedFreight}
+            companies={companies}
+          />
+        ) : (
+          <PlannerResults
+            result={plannerResult}
+            applying={applying}
+            onApply={applySuggestedLayout}
+            onReAnalyze={analyzeLayout}
+            googleRouteEstimates={googleRouteEstimates}
+            loadingGoogleRouteTruckId={loadingGoogleRouteTruckId}
+            onCalculateGoogleRoute={calculateGoogleRouteForTruck}
+          />
+        )}
+      </div>
     </MainLayout>
+  );
+}
+
+function CurrentLayout({
+  activeTrucks,
+  activeAssignedFreight,
+  companies,
+}: {
+  activeTrucks: Truck[];
+  activeAssignedFreight: Shipment[];
+  companies: Company[];
+}) {
+  if (activeTrucks.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dark-border bg-dark-card p-8 text-center">
+        <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-500" />
+        <p className="font-semibold text-white">No active assigned trucks yet.</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Assign freight on the truck board first, then come back here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
+      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black text-white">Current trucks</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Simple view of what is currently assigned before route analysis.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+          {activeTrucks.map((truck) => {
+            const truckFreight = activeAssignedFreight.filter(
+              (shipment) => shipment.assigned_truck_id === truck.id
+            );
+
+            const totalSkids = truckFreight.reduce(
+              (sum, shipment) => sum + Number(shipment.number_of_skids || 0),
+              0
+            );
+
+            const totalWeight = truckFreight.reduce(
+              (sum, shipment) =>
+                sum + Number(shipment.weight_lbs || shipment.weight_kg || 0),
+              0
+            );
+
+            const buckets = summarizeShipmentBuckets(truckFreight);
+
+            return (
+              <div
+                key={truck.id}
+                className="rounded-2xl border border-dark-border bg-slate-950 p-4"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-2xl font-black text-white">
+                      {truck.truck_number}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {truck.driver_name || 'No driver'}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-blue-300">
+                      {truckFreight.length} stops
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {totalSkids} skids • {totalWeight.toLocaleString()} lbs
+                    </p>
+                  </div>
+                </div>
+
+                {buckets.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {buckets.map((bucket) => (
+                      <span
+                        key={bucket.key}
+                        className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-200"
+                      >
+                        {bucket.label}: {bucket.count}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {truckFreight.map((shipment) => {
+                    const locationSource = getShipmentLocationSource(shipment, companies);
+                    const bucket = getRouteBucket(shipment);
+
+                    return (
+                      <ShipmentMiniCard
+                        key={shipment.id}
+                        shipment={shipment}
+                        bucketLabel={bucket.label}
+                        statusLabel={locationSource ? 'GPS' : 'NO GPS'}
+                        statusTone={locationSource ? 'green' : 'red'}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+        <h2 className="flex items-center gap-2 text-xl font-black text-white">
+          <AlertTriangle className="h-5 w-5 text-yellow-300" />
+          Rules
+        </h2>
+
+        <div className="mt-4 space-y-3">
+          <RuleCard
+            title="Freightboy Warehouse"
+            description="Try to keep all warehouse deliveries together on one truck."
+          />
+          <RuleCard
+            title="Buffalo"
+            description="Try to keep Buffalo area deliveries on their own truck."
+          />
+          <RuleCard
+            title="Other freight"
+            description="Fill remaining space without mixing into dedicated trucks when possible."
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -606,11 +661,17 @@ function PlannerResults({
   applying,
   onApply,
   onReAnalyze,
+  googleRouteEstimates,
+  loadingGoogleRouteTruckId,
+  onCalculateGoogleRoute,
 }: {
   result: PlannerResult;
   applying: boolean;
   onApply: () => void;
   onReAnalyze: () => void;
+  googleRouteEstimates: Record<string, GoogleTruckRouteEstimate>;
+  loadingGoogleRouteTruckId: string | null;
+  onCalculateGoogleRoute: (plan: TruckPlan) => void;
 }) {
   const improvementKm = result.currentScoreKm - result.suggestedScoreKm;
   const improvementPercent =
@@ -620,119 +681,38 @@ function PlannerResults({
 
   const bucketSummary = summarizeBuckets(result.stops);
 
+  const trucksWithMoves = result.truckPlans.filter((plan) =>
+    result.crossDockMoves.some(
+      (move) =>
+        move.fromTruckId === plan.truck.id ||
+        move.toTruckId === plan.truck.id
+    )
+  );
+
+  const trucksWithoutMoves = result.truckPlans.filter(
+    (plan) =>
+      !result.crossDockMoves.some(
+        (move) =>
+          move.fromTruckId === plan.truck.id ||
+          move.toTruckId === plan.truck.id
+      )
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <SummaryBox
-          label="Current layout score"
-          value={`${Math.round(result.currentScoreKm).toLocaleString()} km`}
-        />
-
-        <SummaryBox
-          label="Suggested score"
-          value={`${Math.round(result.suggestedScoreKm).toLocaleString()} km`}
-        />
-
-        <SummaryBox
-          label="Estimated improvement"
-          value={`${Math.max(0, improvementPercent)}%`}
-        />
-
-        <SummaryBox
-          label="Cross-dock moves"
-          value={String(result.crossDockMoves.length)}
-        />
-      </div>
-
-      {bucketSummary.length > 0 && (
-        <div className="card">
-          <h2 className="mb-3 text-xl font-bold text-white">
-            Route Buckets
-          </h2>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {bucketSummary.map((bucket) => (
-              <div
-                key={bucket.key}
-                className="rounded-xl border border-dark-border bg-slate-950 p-4"
-              >
-                <p className="font-bold text-white">{bucket.label}</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {bucket.count} stop(s) • {bucket.skids} skids
-                </p>
-                <p className="mt-1 text-sm text-blue-300">
-                  Suggested truck: {bucket.truckNumbers.join(', ')}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {result.missingLocationStops.length > 0 && (
-        <div className="rounded-xl border border-yellow-900 bg-yellow-950/30 p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-yellow-100">
-            <AlertTriangle className="h-5 w-5" />
-            Missing Delivery GPS
-          </h2>
-
-          <p className="mb-4 text-sm leading-6 text-yellow-100/80">
-            These pickups were skipped because the planner could not find GPS on the shipment or on a matched delivery company.
-          </p>
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {result.missingLocationStops.map((item) => (
-              <div
-                key={item.shipment.id}
-                className="rounded-lg border border-yellow-900/80 bg-black/30 p-3"
-              >
-                <p className="font-semibold text-yellow-100">
-                  {getPickupDisplayName(item.shipment)}
-                </p>
-
-                <p className="mt-1 text-xs text-yellow-100/70">
-                  Pickup: {displayLocation(
-                    item.shipment.pickup_address,
-                    item.shipment.pickup_city
-                  )}
-                </p>
-
-                <p className="mt-1 text-xs text-yellow-100/70">
-                  Delivers to: {getDeliveryDisplayName(item.shipment)}
-                </p>
-
-                <p className="mt-1 text-xs text-yellow-100/70">
-                  Delivery address: {displayLocation(
-                    item.shipment.delivery_address,
-                    item.shipment.delivery_city
-                  )}
-                </p>
-
-                <p className="mt-1 text-xs text-yellow-100/70">
-                  Current truck: {item.truckNumber}
-                </p>
-
-                <p className="mt-1 text-xs text-yellow-100/70">
-                  {item.reason}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <CrossDockMovesByTruck result={result} />
-
-      <div className="card">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-white">
-              <Shuffle className="h-5 w-5 text-blue-400" />
-              Full Cross-Dock Move List
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-300">
+              Route analysis complete
+            </p>
+
+            <h2 className="mt-1 text-2xl font-black text-white">
+              Review the plan before applying
             </h2>
 
             <p className="mt-1 text-sm text-slate-400">
-              This is every physical move needed on the dock.
+              Start with dock moves. Then open a truck card and calculate its Google route.
             </p>
           </div>
 
@@ -753,268 +733,403 @@ function PlannerResults({
               disabled={applying || result.crossDockMoves.length === 0}
             >
               <Check className="h-4 w-4" />
-              {applying ? 'Applying...' : 'Apply Suggested Layout'}
+              {applying ? 'Applying...' : 'Apply Layout'}
             </button>
           </div>
         </div>
 
-        {result.crossDockMoves.length === 0 ? (
-          <div className="rounded-lg border border-green-900 bg-green-950/30 p-4">
-            <p className="font-semibold text-green-100">
-              The current layout already looks reasonable based on available coordinates.
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <AnalyzeStatCard
+            label="Dock moves"
+            value={String(result.crossDockMoves.length)}
+            helpText={
+              result.crossDockMoves.length === 0
+                ? 'Nothing to move'
+                : 'Skids to move'
+            }
+            tone={result.crossDockMoves.length === 0 ? 'green' : 'blue'}
+          />
+
+          <AnalyzeStatCard
+            label="Trucks changing"
+            value={String(trucksWithMoves.length)}
+            helpText={`Out of ${result.truckPlans.length} trucks`}
+            tone={trucksWithMoves.length === 0 ? 'green' : 'yellow'}
+          />
+
+          <AnalyzeStatCard
+            label="Route groups"
+            value={String(bucketSummary.length)}
+            helpText="Warehouse, Buffalo, cities"
+            tone="purple"
+          />
+
+          <AnalyzeStatCard
+            label="Improvement"
+            value={`${Math.max(0, improvementPercent)}%`}
+            helpText={`${Math.max(0, Math.round(improvementKm)).toLocaleString()} km cleaner`}
+            tone={improvementPercent > 0 ? 'green' : 'slate'}
+          />
+        </div>
+      </div>
+
+      {bucketSummary.length > 0 && (
+        <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+          <div className="mb-4">
+            <h2 className="text-xl font-black text-white">Route groups</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Quick view of what type of freight each truck is getting.
             </p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {result.crossDockMoves.map((move) => (
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {bucketSummary.map((bucket) => (
+              <RouteGroupSummaryCard key={bucket.key} bucket={bucket} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result.missingLocationStops.length > 0 && (
+        <details className="rounded-2xl border border-yellow-900 bg-yellow-950/30 p-5">
+          <summary className="cursor-pointer list-none">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-black text-yellow-100">
+                  <AlertTriangle className="h-5 w-5" />
+                  {result.missingLocationStops.length} stop(s) skipped because GPS is missing
+                </h2>
+
+                <p className="mt-1 text-sm text-yellow-100/80">
+                  Click to view them. Run Fix GPS, refresh, and analyze again.
+                </p>
+              </div>
+
+              <span className="flex items-center gap-2 rounded-full border border-yellow-800 bg-yellow-900/40 px-3 py-1 text-xs font-black text-yellow-100">
+                Show skipped stops
+                <ChevronDown className="h-3 w-3" />
+              </span>
+            </div>
+          </summary>
+
+          <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {result.missingLocationStops.map((item) => (
               <div
-                key={move.shipment.id}
-                className="rounded-xl border border-dark-border bg-slate-900 p-4"
+                key={item.shipment.id}
+                className="rounded-xl border border-yellow-900/80 bg-black/30 p-3"
               >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-lg font-bold text-white">
-                      {getPickupDisplayName(move.shipment)}
-                    </p>
+                <p className="font-bold text-yellow-100">
+                  {getPickupDisplayName(item.shipment)}
+                </p>
 
-                    <p className="mt-1 text-sm text-slate-300">
-                      Pickup: {displayLocation(
-                        move.shipment.pickup_address,
-                        move.shipment.pickup_city
-                      )}
-                    </p>
+                <p className="mt-1 text-xs text-yellow-100/70">
+                  To: {getDeliveryDisplayName(item.shipment)}
+                </p>
 
-                    <p className="mt-1 text-sm text-blue-300">
-                      Delivers to: {getDeliveryDisplayName(move.shipment)}
-                    </p>
-
-                    <p className="mt-1 text-xs text-purple-300">
-                      Bucket: {getRouteBucket(move.shipment).label}
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      {move.skids} skids • {move.weightLbs.toLocaleString()} lbs
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-lg border border-red-900 bg-red-950 px-3 py-2 text-sm font-bold text-red-100">
-                      OFF {move.fromTruckNumber}
-                    </span>
-
-                    <ArrowRight className="h-5 w-5 text-slate-400" />
-
-                    <span className="rounded-lg border border-green-900 bg-green-950 px-3 py-2 text-sm font-bold text-green-100">
-                      ON {move.toTruckNumber}
-                    </span>
-                  </div>
-                </div>
+                <p className="mt-1 text-xs text-yellow-100/70">
+                  Current truck: {item.truckNumber}
+                </p>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </details>
+      )}
 
-      <div className="card">
-        <h2 className="mb-2 text-xl font-bold text-white">
-          Final Truck Layout After Cross-Dock
-        </h2>
+      {result.crossDockMoves.length === 0 ? (
+        <div className="rounded-2xl border border-green-900 bg-green-950/30 p-5">
+          <p className="text-lg font-black text-green-100">
+            No cross-dock moves needed.
+          </p>
 
-        <p className="mb-5 text-sm text-slate-400">
-          Each truck now shows what to remove, what to add, and what stays.
-        </p>
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          {result.truckPlans.map((plan) => (
-            <FinalTruckPlanCard
-              key={plan.truck.id}
-              plan={plan}
-            />
-          ))}
+          <p className="mt-1 text-sm text-green-100/70">
+            The current truck layout already matches the available GPS and route bucket rules.
+          </p>
         </div>
-      </div>
-    </div>
-  );
-}
+      ) : (
+        <CleanDockMovesPanel result={result} />
+      )}
 
-function CrossDockMovesByTruck({ result }: { result: PlannerResult }) {
-  if (result.crossDockMoves.length === 0) {
-    return null;
-  }
+      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-black text-white">
+              Final truck board
+            </h2>
 
-  const trucksWithMoves = result.truckPlans.filter((plan) =>
-    result.crossDockMoves.some(
-      (move) =>
-        move.fromTruckId === plan.truck.id ||
-        move.toTruckId === plan.truck.id
-    )
-  );
+            <p className="text-sm text-slate-400">
+              Cards start closed. Open a truck to calculate its Google route.
+            </p>
+          </div>
 
-  return (
-    <div className="card">
-      <h2 className="mb-2 text-xl font-bold text-white">
-        Cross-Dock Instructions By Truck
-      </h2>
+          <p className="text-sm font-semibold text-slate-400">
+            {result.truckPlans.length} trucks total
+          </p>
+        </div>
 
-      <p className="mb-5 text-sm text-slate-400">
-        This is the dock view: what comes off each truck, and what gets added to each truck.
-      </p>
+        {trucksWithMoves.length > 0 && (
+          <div className="mb-6">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-blue-300">
+              Trucks with changes
+            </p>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        {trucksWithMoves.map((plan) => {
-          const movingOff = result.crossDockMoves.filter(
-            (move) => move.fromTruckId === plan.truck.id
-          );
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {trucksWithMoves.map((plan) => (
+                <FinalTruckPlanCard
+                  key={plan.truck.id}
+                  plan={plan}
+                  priority
+                  googleRouteEstimate={googleRouteEstimates[plan.truck.id]}
+                  googleRouteLoading={loadingGoogleRouteTruckId === plan.truck.id}
+                  onCalculateGoogleRoute={onCalculateGoogleRoute}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-          const movingOn = result.crossDockMoves.filter(
-            (move) => move.toTruckId === plan.truck.id
-          );
-
-          return (
-            <div
-              key={plan.truck.id}
-              className="rounded-xl border border-dark-border bg-slate-950 p-5"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
+        {trucksWithoutMoves.length > 0 && (
+          <details className="rounded-2xl border border-dark-border bg-slate-950/60 p-4">
+            <summary className="cursor-pointer list-none">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-2xl font-black text-white">
-                    {plan.truck.truck_number}
-                  </h3>
+                  <p className="font-black text-white">
+                    Trucks with no changes
+                  </p>
 
                   <p className="text-sm text-slate-400">
-                    {plan.truck.driver_name || 'No driver'}
+                    {trucksWithoutMoves.length} truck(s) stay the same.
                   </p>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-                    Dock Actions
-                  </p>
-
-                  <p className="mt-1 text-sm font-bold text-white">
-                    {movingOff.length} off • {movingOn.length} on
-                  </p>
-                </div>
+                <span className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-black text-slate-300">
+                  Show
+                  <ChevronDown className="h-3 w-3" />
+                </span>
               </div>
+            </summary>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-red-900 bg-red-950/30 p-4">
-                  <p className="mb-3 text-sm font-black uppercase tracking-wide text-red-200">
-                    Take Off {plan.truck.truck_number}
-                  </p>
-
-                  {movingOff.length === 0 ? (
-                    <p className="text-sm text-red-100/60">
-                      Nothing comes off this truck.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {movingOff.map((move) => (
-                        <DockMoveCard
-                          key={move.shipment.id}
-                          shipment={move.shipment}
-                          badge={`TO ${move.toTruckNumber}`}
-                          tone="red"
-                          skids={move.skids}
-                          weightLbs={move.weightLbs}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-green-900 bg-green-950/30 p-4">
-                  <p className="mb-3 text-sm font-black uppercase tracking-wide text-green-200">
-                    Add To {plan.truck.truck_number}
-                  </p>
-
-                  {movingOn.length === 0 ? (
-                    <p className="text-sm text-green-100/60">
-                      Nothing gets added to this truck.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {movingOn.map((move) => (
-                        <DockMoveCard
-                          key={move.shipment.id}
-                          shipment={move.shipment}
-                          badge={`FROM ${move.fromTruckNumber}`}
-                          tone="green"
-                          skids={move.skids}
-                          weightLbs={move.weightLbs}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {trucksWithoutMoves.map((plan) => (
+                <FinalTruckPlanCard
+                  key={plan.truck.id}
+                  plan={plan}
+                  googleRouteEstimate={googleRouteEstimates[plan.truck.id]}
+                  googleRouteLoading={loadingGoogleRouteTruckId === plan.truck.id}
+                  onCalculateGoogleRoute={onCalculateGoogleRoute}
+                />
+              ))}
             </div>
-          );
-        })}
+          </details>
+        )}
       </div>
     </div>
   );
 }
 
-function DockMoveCard({
-  shipment,
-  badge,
+function AnalyzeStatCard({
+  label,
+  value,
+  helpText,
   tone,
-  skids,
-  weightLbs,
 }: {
-  shipment: Shipment;
-  badge: string;
-  tone: 'red' | 'green';
-  skids: number;
-  weightLbs: number;
+  label: string;
+  value: string;
+  helpText: string;
+  tone: 'blue' | 'green' | 'yellow' | 'purple' | 'slate';
 }) {
+  const toneClasses = {
+    blue: 'border-blue-900 bg-blue-950/30 text-blue-200',
+    green: 'border-green-900 bg-green-950/30 text-green-200',
+    yellow: 'border-yellow-900 bg-yellow-950/30 text-yellow-200',
+    purple: 'border-purple-900 bg-purple-950/30 text-purple-200',
+    slate: 'border-dark-border bg-slate-950 text-slate-200',
+  };
+
   return (
-    <div className="rounded-lg border border-black/30 bg-black/30 p-3">
+    <div className={`rounded-2xl border p-4 ${toneClasses[tone]}`}>
+      <p className="text-xs font-black uppercase tracking-wide opacity-70">
+        {label}
+      </p>
+
+      <p className="mt-2 text-3xl font-black text-white">
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs opacity-80">
+        {helpText}
+      </p>
+    </div>
+  );
+}
+
+function RouteGroupSummaryCard({
+  bucket,
+}: {
+  bucket: {
+    key: string;
+    label: string;
+    count: number;
+    skids: number;
+    truckNumbers: string[];
+  };
+}) {
+  const isWarehouse = bucket.key === 'freightboy_warehouse';
+  const isBuffalo = bucket.key === 'buffalo';
+
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${
+        isWarehouse
+          ? 'border-blue-900 bg-blue-950/30'
+          : isBuffalo
+            ? 'border-purple-900 bg-purple-950/30'
+            : 'border-dark-border bg-slate-950'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
-            {getPickupDisplayName(shipment)}
+          <p className="truncate text-lg font-black text-white">
+            {bucket.label}
           </p>
 
-          <p className="mt-1 text-xs text-slate-300">
-            Pickup: {displayLocation(shipment.pickup_address, shipment.pickup_city)}
+          <p className="mt-1 text-sm text-slate-400">
+            {bucket.count} stops • {bucket.skids} skids
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-black text-slate-200">
+          {bucket.truckNumbers.length} truck
+          {bucket.truckNumbers.length === 1 ? '' : 's'}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm font-semibold text-blue-300">
+        {bucket.truckNumbers.join(', ')}
+      </p>
+    </div>
+  );
+}
+
+function CleanDockMovesPanel({ result }: { result: PlannerResult }) {
+  const movesByFromTruck = groupMovesByFromTruck(result.crossDockMoves);
+
+  return (
+    <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+      <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-black text-white">
+            Dock moves
+          </h2>
+
+          <p className="text-sm text-slate-400">
+            Work from top to bottom. Each section shows what comes off one truck.
+          </p>
+        </div>
+
+        <p className="text-sm font-semibold text-blue-300">
+          {result.crossDockMoves.length} total move
+          {result.crossDockMoves.length === 1 ? '' : 's'}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {movesByFromTruck.map((group) => (
+          <div
+            key={group.fromTruckId}
+            className="rounded-2xl border border-dark-border bg-slate-950 p-4"
+          >
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-red-300">
+                  Take off
+                </p>
+
+                <h3 className="text-2xl font-black text-white">
+                  Truck {group.fromTruckNumber}
+                </h3>
+              </div>
+
+              <div className="rounded-xl border border-red-900 bg-red-950/30 px-4 py-2 text-right">
+                <p className="text-sm font-black text-red-100">
+                  {group.moves.length} move
+                  {group.moves.length === 1 ? '' : 's'}
+                </p>
+
+                <p className="text-xs text-red-100/70">
+                  {group.skids} skids • {group.weightLbs.toLocaleString()} lbs
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {group.moves.map((move) => (
+                <CleanDockMoveRow key={move.shipment.id} move={move} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CleanDockMoveRow({ move }: { move: CrossDockMove }) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-slate-900 p-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-white">
+            {getPickupDisplayName(move.shipment)}
           </p>
 
-          <p className="mt-1 text-xs text-blue-300">
-            Delivers to: {getDeliveryDisplayName(shipment)}
-          </p>
-
-          <p className="mt-1 text-xs text-purple-300">
-            {getRouteBucket(shipment).label}
+          <p className="mt-1 truncate text-xs text-blue-300">
+            To: {getDeliveryDisplayName(move.shipment)}
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            {skids} skids • {weightLbs.toLocaleString()} lbs
+            {getRouteBucket(move.shipment).label} • {move.skids} skids • {move.weightLbs.toLocaleString()} lbs
           </p>
         </div>
 
-        <span
-          className={`flex-shrink-0 rounded px-2 py-1 text-[10px] font-black ${
-            tone === 'red'
-              ? 'bg-red-700 text-white'
-              : 'bg-green-700 text-white'
-          }`}
-        >
-          {badge}
-        </span>
+        <div className="flex items-center gap-2 rounded-xl border border-green-900 bg-green-950/30 px-3 py-2">
+          <span className="text-xs font-black text-red-200">
+            {move.fromTruckNumber}
+          </span>
+
+          <ArrowRight className="h-4 w-4 text-slate-400" />
+
+          <span className="text-sm font-black text-green-100">
+            {move.toTruckNumber}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function FinalTruckPlanCard({ plan }: { plan: TruckPlan }) {
+function FinalTruckPlanCard({
+  plan,
+  priority = false,
+  googleRouteEstimate,
+  googleRouteLoading,
+  onCalculateGoogleRoute,
+}: {
+  plan: TruckPlan;
+  priority?: boolean;
+  googleRouteEstimate?: GoogleTruckRouteEstimate;
+  googleRouteLoading: boolean;
+  onCalculateGoogleRoute: (plan: TruckPlan) => void;
+}) {
   const movingIn = plan.suggestedStops.filter(
     (stop) => stop.currentTruckId !== plan.truck.id
   );
 
   const movingOut = plan.currentStops.filter(
     (stop) => stop.suggestedTruckId !== plan.truck.id
+  );
+
+  const staying = plan.suggestedStops.filter(
+    (stop) => stop.currentTruckId === plan.truck.id
   );
 
   const overSkids = plan.suggestedSkids > (plan.truck.capacity_skids || 12);
@@ -1024,101 +1139,238 @@ function FinalTruckPlanCard({ plan }: { plan: TruckPlan }) {
   const routeGroups = summarizeBuckets(plan.suggestedStops);
 
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-950 p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-2xl font-black text-white">
-            {plan.truck.truck_number}
-          </h3>
+    <details
+      className={`rounded-2xl border p-4 ${
+        priority
+          ? 'border-blue-900 bg-blue-950/20'
+          : 'border-dark-border bg-slate-950'
+      }`}
+    >
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-2xl font-black text-white">
+                {plan.truck.truck_number}
+              </h3>
 
-          <p className="text-sm text-slate-400">
-            {plan.truck.driver_name || 'No driver'}
+              {movingIn.length + movingOut.length > 0 ? (
+                <span className="rounded-full border border-blue-800 bg-blue-900/40 px-2 py-1 text-[10px] font-black text-blue-100">
+                  CHANGES
+                </span>
+              ) : (
+                <span className="rounded-full border border-green-800 bg-green-900/30 px-2 py-1 text-[10px] font-black text-green-100">
+                  SAME
+                </span>
+              )}
+            </div>
+
+            <p className="mt-1 text-sm text-slate-400">
+              {plan.truck.driver_name || 'No driver'}
+            </p>
+
+            {routeGroups.length > 0 && (
+              <p className="mt-1 truncate text-xs font-semibold text-purple-300">
+                {routeGroups.map((group) => group.label).join(' • ')}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 text-center sm:min-w-[320px]">
+            <TruckTinyStat label="Off" value={String(movingOut.length)} tone="red" />
+            <TruckTinyStat label="On" value={String(movingIn.length)} tone="green" />
+            <TruckTinyStat label="Stay" value={String(staying.length)} tone="slate" />
+            <TruckTinyStat label="Skids" value={String(plan.suggestedSkids)} tone={overSkids ? 'red' : 'blue'} />
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dark-border bg-slate-900 px-3 py-2">
+          <p
+            className={`text-xs font-semibold ${
+              overWeight || overSkids ? 'text-red-300' : 'text-slate-400'
+            }`}
+          >
+            Final load: {plan.suggestedSkids}/{plan.truck.capacity_skids || 12} skids •{' '}
+            {plan.suggestedWeightLbs.toLocaleString()}/{(plan.truck.max_weight_lbs || 15000).toLocaleString()} lbs
           </p>
 
-          {routeGroups.length > 0 && (
-            <p className="mt-1 text-xs font-semibold text-purple-300">
-              {routeGroups.map((group) => group.label).join(' • ')}
+          <ChevronDown className="h-4 w-4 text-slate-500" />
+        </div>
+      </summary>
+
+      <div className="mt-4 space-y-4">
+        <div className="rounded-2xl border border-blue-900 bg-blue-950/20 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-blue-200">
+                <Route className="h-4 w-4" />
+                Google route
+              </p>
+
+              <p className="mt-1 text-xs text-blue-100/70">
+                Calculates road distance and drive time for this truck using the final suggested stops.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onCalculateGoogleRoute(plan)}
+              className="btn-secondary flex items-center justify-center gap-2"
+              disabled={googleRouteLoading || plan.suggestedStops.length < 2}
+            >
+              <Route className="h-4 w-4" />
+              {googleRouteLoading ? 'Calculating...' : 'Calculate Google Route'}
+            </button>
+          </div>
+
+          {plan.suggestedStops.length < 2 && (
+            <p className="mt-3 text-xs text-yellow-200">
+              This truck needs at least two GPS-ready stops to calculate a route.
             </p>
+          )}
+
+          {plan.suggestedStops.length > 27 && (
+            <p className="mt-3 text-xs text-yellow-200">
+              This truck has more than 27 stops, so split it before calculating a Google route.
+            </p>
+          )}
+
+          {googleRouteEstimate && (
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
+              <div className="rounded-xl border border-blue-900 bg-slate-950 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Distance
+                </p>
+                <p className="mt-1 text-2xl font-black text-white">
+                  {googleRouteEstimate.distanceText}
+                </p>
+
+                <p className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">
+                  Drive time
+                </p>
+                <p className="mt-1 text-2xl font-black text-white">
+                  {googleRouteEstimate.durationText}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-dark-border bg-slate-950 p-4">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">
+                  Google optimized stop order
+                </p>
+
+                <div className="space-y-2">
+                  {googleRouteEstimate.orderedStops.map((stop, index) => (
+                    <div
+                      key={`${stop.shipmentId}-${index}`}
+                      className="flex items-center gap-3 rounded-lg border border-dark-border bg-slate-900 px-3 py-2"
+                    >
+                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-900 text-xs font-black text-blue-100">
+                        {index + 1}
+                      </span>
+
+                      <p className="truncate text-sm font-semibold text-white">
+                        {stop.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        <div className="text-right">
-          <p className={`text-sm font-bold ${overSkids ? 'text-red-300' : 'text-blue-300'}`}>
-            Final: {plan.suggestedSkids}/{plan.truck.capacity_skids || 12} skids
-          </p>
+        {(movingOut.length > 0 || movingIn.length > 0) && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <MoveColumn title="Take off" tone="red" count={movingOut.length}>
+              {movingOut.length === 0 ? (
+                <EmptyMoveText text="Nothing comes off." />
+              ) : (
+                movingOut.map((stop) => (
+                  <FinalMoveCard
+                    key={stop.shipment.id}
+                    stop={stop}
+                    badge={`TO ${stop.suggestedTruckNumber}`}
+                    tone="red"
+                  />
+                ))
+              )}
+            </MoveColumn>
 
-          <p className={`text-xs ${overWeight ? 'text-red-300' : 'text-slate-500'}`}>
-            {plan.suggestedWeightLbs.toLocaleString()}/{(plan.truck.max_weight_lbs || 15000).toLocaleString()} lbs
-          </p>
-        </div>
-      </div>
-
-      {movingOut.length > 0 && (
-        <div className="mb-4 rounded-xl border border-red-900 bg-red-950/30 p-4">
-          <p className="mb-3 text-sm font-black uppercase tracking-wide text-red-200">
-            Take These Skids Off {plan.truck.truck_number}
-          </p>
-
-          <div className="space-y-2">
-            {movingOut.map((stop) => (
-              <FinalMoveCard
-                key={stop.shipment.id}
-                stop={stop}
-                badge={`MOVE TO ${stop.suggestedTruckNumber}`}
-                tone="red"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {movingIn.length > 0 && (
-        <div className="mb-4 rounded-xl border border-green-900 bg-green-950/30 p-4">
-          <p className="mb-3 text-sm font-black uppercase tracking-wide text-green-200">
-            Add These Skids To {plan.truck.truck_number}
-          </p>
-
-          <div className="space-y-2">
-            {movingIn.map((stop) => (
-              <FinalMoveCard
-                key={stop.shipment.id}
-                stop={stop}
-                badge={`FROM ${stop.currentTruckNumber}`}
-                tone="green"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div>
-        <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
-          Final Load On {plan.truck.truck_number}
-        </p>
-
-        {plan.suggestedStops.length === 0 ? (
-          <div className="rounded-lg border border-dark-border bg-black/40 p-4">
-            <p className="text-sm text-slate-500">
-              No freight suggested for this truck.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {plan.suggestedStops.map((stop) => (
-              <FinalStopCard
-                key={stop.shipment.id}
-                stop={stop}
-                badge={
-                  stop.currentTruckId === plan.truck.id
-                    ? 'STAYS'
-                    : `FROM ${stop.currentTruckNumber}`
-                }
-                tone={stop.currentTruckId === plan.truck.id ? 'neutral' : 'green'}
-              />
-            ))}
+            <MoveColumn title="Add on" tone="green" count={movingIn.length}>
+              {movingIn.length === 0 ? (
+                <EmptyMoveText text="Nothing gets added." />
+              ) : (
+                movingIn.map((stop) => (
+                  <FinalMoveCard
+                    key={stop.shipment.id}
+                    stop={stop}
+                    badge={`FROM ${stop.currentTruckNumber}`}
+                    tone="green"
+                  />
+                ))
+              )}
+            </MoveColumn>
           </div>
         )}
+
+        <div>
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+            Final load
+          </p>
+
+          {plan.suggestedStops.length === 0 ? (
+            <div className="rounded-xl border border-dark-border bg-black/40 p-4">
+              <p className="text-sm text-slate-500">
+                No freight suggested for this truck.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {plan.suggestedStops.map((stop) => (
+                <FinalStopCard
+                  key={stop.shipment.id}
+                  stop={stop}
+                  badge={
+                    stop.currentTruckId === plan.truck.id
+                      ? 'STAYS'
+                      : `FROM ${stop.currentTruckNumber}`
+                  }
+                  tone={stop.currentTruckId === plan.truck.id ? 'neutral' : 'green'}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+    </details>
+  );
+}
+
+function TruckTinyStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'red' | 'green' | 'blue' | 'slate';
+}) {
+  const toneClasses = {
+    red: 'border-red-900 bg-red-950/30 text-red-100',
+    green: 'border-green-900 bg-green-950/30 text-green-100',
+    blue: 'border-blue-900 bg-blue-950/30 text-blue-100',
+    slate: 'border-dark-border bg-slate-900 text-slate-200',
+  };
+
+  return (
+    <div className={`rounded-xl border px-2 py-2 ${toneClasses[tone]}`}>
+      <p className="text-[10px] font-black uppercase tracking-wide opacity-70">
+        {label}
+      </p>
+
+      <p className="mt-1 text-lg font-black text-white">
+        {value}
+      </p>
     </div>
   );
 }
@@ -1133,28 +1385,22 @@ function FinalMoveCard({
   tone: 'red' | 'green';
 }) {
   return (
-    <div className="rounded-lg border border-black/30 bg-black/30 p-3">
+    <div className="rounded-xl border border-black/30 bg-black/30 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
+          <p className="truncate text-sm font-black text-white">
             {getPickupDisplayName(stop.shipment)}
           </p>
-
-          <p className="mt-1 text-xs text-blue-300">
-            Delivers to: {getDeliveryDisplayName(stop.shipment)}
+          <p className="mt-1 truncate text-xs text-blue-300">
+            To: {getDeliveryDisplayName(stop.shipment)}
           </p>
-
-          <p className="mt-1 text-xs text-purple-300">
-            {stop.routeBucketLabel}
-          </p>
-
           <p className="mt-1 text-xs text-slate-500">
-            {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
+            {stop.routeBucketLabel} • {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
           </p>
         </div>
 
         <span
-          className={`flex-shrink-0 rounded px-2 py-1 text-[10px] font-black ${
+          className={`flex-shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${
             tone === 'red'
               ? 'bg-red-700 text-white'
               : 'bg-green-700 text-white'
@@ -1178,7 +1424,7 @@ function FinalStopCard({
 }) {
   return (
     <div
-      className={`rounded-lg border p-3 ${
+      className={`rounded-xl border p-3 ${
         tone === 'green'
           ? 'border-green-800 bg-green-950/40'
           : 'border-dark-border bg-slate-900'
@@ -1186,33 +1432,22 @@ function FinalStopCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
+          <p className="truncate text-sm font-black text-white">
             {getPickupDisplayName(stop.shipment)}
           </p>
 
-          <p className="mt-1 text-xs text-slate-300">
-            Pickup: {displayLocation(
-              stop.shipment.pickup_address,
-              stop.shipment.pickup_city
-            )}
+          <p className="mt-1 truncate text-xs text-blue-300">
+            To: {getDeliveryDisplayName(stop.shipment)}
           </p>
 
-          <p className="mt-1 text-xs text-blue-300">
-            Delivers to: {getDeliveryDisplayName(stop.shipment)}
-          </p>
-
-          <p className="mt-1 text-xs text-purple-300">
-            Bucket: {stop.routeBucketLabel}
-          </p>
-
-          <p className="mt-2 text-xs text-slate-500">
-            {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
+          <p className="mt-1 text-xs text-slate-500">
+            {stop.routeBucketLabel} • {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-2">
           <span
-            className={`rounded px-2 py-1 text-[10px] font-black ${
+            className={`rounded-lg px-2 py-1 text-[10px] font-black ${
               tone === 'green'
                 ? 'bg-green-700 text-white'
                 : 'bg-slate-700 text-slate-100'
@@ -1232,6 +1467,158 @@ function FinalStopCard({
   );
 }
 
+function ShipmentMiniCard({
+  shipment,
+  bucketLabel,
+  statusLabel,
+  statusTone,
+}: {
+  shipment: Shipment;
+  bucketLabel: string;
+  statusLabel: string;
+  statusTone: 'green' | 'red';
+}) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-slate-900 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black text-white">
+            {getPickupDisplayName(shipment)}
+          </p>
+          <p className="mt-1 truncate text-xs text-blue-300">
+            To: {getDeliveryDisplayName(shipment)}
+          </p>
+          <p className="mt-1 truncate text-xs text-slate-500">
+            {displayLocation(shipment.delivery_address, shipment.delivery_city)}
+          </p>
+          <p className="mt-1 text-xs text-purple-300">{bucketLabel}</p>
+        </div>
+
+        <span
+          className={`flex-shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${
+            statusTone === 'green'
+              ? 'bg-green-800 text-green-100'
+              : 'bg-red-800 text-red-100'
+          }`}
+        >
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function GeocodeSummary({
+  logs,
+}: {
+  logs: GeocodeDeliveriesResponse['logs'];
+}) {
+  const successCount = logs.filter((log) => log.status === 'success').length;
+  const skippedCount = logs.filter((log) => log.status === 'skipped').length;
+  const errorCount = logs.filter((log) => log.status === 'error').length;
+
+  return (
+    <details className="rounded-2xl border border-dark-border bg-dark-card p-5">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-white">Latest GPS results</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {successCount} saved • {skippedCount} skipped • {errorCount} failed
+            </p>
+          </div>
+
+          <p className="flex items-center gap-2 text-sm font-semibold text-blue-300">
+            Click to show details
+            <ChevronDown className="h-4 w-4" />
+          </p>
+        </div>
+      </summary>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+        {logs.slice(0, 12).map((log, index) => (
+          <div
+            key={`${log.shipmentId}-${log.status}-${index}`}
+            className={`rounded-xl border p-3 ${
+              log.status === 'success'
+                ? 'border-green-900 bg-green-950/30'
+                : log.status === 'skipped'
+                  ? 'border-yellow-900 bg-yellow-950/30'
+                  : 'border-red-900 bg-red-950/30'
+            }`}
+          >
+            <p className="font-bold text-white">{log.label}</p>
+            <p className="mt-1 truncate text-xs text-slate-400">{log.address}</p>
+            <p className="mt-1 text-xs text-slate-300">{log.message}</p>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function RuleCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-slate-950 p-4">
+      <p className="font-black text-white">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
+    </div>
+  );
+}
+
+function MoveColumn({
+  title,
+  tone,
+  count,
+  children,
+}: {
+  title: string;
+  tone: 'red' | 'green';
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${
+        tone === 'red'
+          ? 'border-red-900 bg-red-950/30'
+          : 'border-green-900 bg-green-950/30'
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p
+          className={`text-sm font-black uppercase tracking-wide ${
+            tone === 'red' ? 'text-red-200' : 'text-green-200'
+          }`}
+        >
+          {title}
+        </p>
+        <span
+          className={`rounded-full px-2 py-1 text-xs font-black ${
+            tone === 'red'
+              ? 'bg-red-900 text-red-100'
+              : 'bg-green-900 text-green-100'
+          }`}
+        >
+          {count}
+        </span>
+      </div>
+
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function EmptyMoveText({ text }: { text: string }) {
+  return <p className="text-sm text-slate-400">{text}</p>;
+}
+
 function SummaryBox({
   label,
   value,
@@ -1240,15 +1627,94 @@ function SummaryBox({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-dark-card px-4 py-3">
+    <div className="rounded-xl border border-dark-border bg-slate-950 px-4 py-3">
       <p className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </p>
 
-      <p className="mt-1 text-2xl font-bold text-white">
+      <p className="mt-1 text-2xl font-black text-white">
         {value}
       </p>
     </div>
+  );
+}
+
+function summarizeShipmentBuckets(shipments: Shipment[]) {
+  const groups = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      count: number;
+    }
+  >();
+
+  for (const shipment of shipments) {
+    const bucket = getRouteBucket(shipment);
+
+    if (!groups.has(bucket.key)) {
+      groups.set(bucket.key, {
+        key: bucket.key,
+        label: bucket.label,
+        count: 0,
+      });
+    }
+
+    const group = groups.get(bucket.key);
+
+    if (group) {
+      group.count++;
+    }
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    const aPriority = getBucketPriorityFromKey(a.key);
+    const bPriority = getBucketPriorityFromKey(b.key);
+
+    if (aPriority !== bPriority) {
+      return bPriority - aPriority;
+    }
+
+    return a.label.localeCompare(b.label);
+  });
+}
+
+function groupMovesByFromTruck(moves: CrossDockMove[]) {
+  const groups = new Map<
+    string,
+    {
+      fromTruckId: string;
+      fromTruckNumber: string;
+      moves: CrossDockMove[];
+      skids: number;
+      weightLbs: number;
+    }
+  >();
+
+  for (const move of moves) {
+    if (!groups.has(move.fromTruckId)) {
+      groups.set(move.fromTruckId, {
+        fromTruckId: move.fromTruckId,
+        fromTruckNumber: move.fromTruckNumber,
+        moves: [],
+        skids: 0,
+        weightLbs: 0,
+      });
+    }
+
+    const group = groups.get(move.fromTruckId);
+
+    if (!group) {
+      continue;
+    }
+
+    group.moves.push(move);
+    group.skids += move.skids;
+    group.weightLbs += move.weightLbs;
+  }
+
+  return Array.from(groups.values()).sort((a, b) =>
+    safeString(a.fromTruckNumber).localeCompare(safeString(b.fromTruckNumber))
   );
 }
 

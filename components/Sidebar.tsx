@@ -160,10 +160,10 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         <div className="mb-8">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-blue-400">
             <Truck className="h-8 w-8" />
-            Dispatch Pro
+            Dispatch Testing Website
           </h1>
           <p className="mt-1 text-xs text-slate-400">
-            Trucking Management System
+            Placeholder
           </p>
         </div>
       )}
