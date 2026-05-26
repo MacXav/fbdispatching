@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-dark-bg text-slate-100;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply rounded-lg bg-slate-700 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-danger {
+    @apply rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-success {
+    @apply rounded-lg bg-green-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .card {
+    @apply rounded-xl border border-dark-border bg-dark-card p-5 shadow-lg shadow-black/10 sm:p-6;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-dark-border bg-slate-800 px-4 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500;
+  }
+
+  .select-field {
+    @apply w-full rounded-lg border border-dark-border bg-slate-800 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500;
+  }
+
+  .badge {
+    @apply inline-block rounded-full px-3 py-1 text-sm font-semibold;
+  }
+
+  .badge-pending {
+    @apply badge bg-yellow-900 text-yellow-200;
+  }
+
+  .badge-picked-up {
+    @apply badge bg-blue-900 text-blue-200;
+  }
+
+  .badge-at-cross-dock {
+    @apply badge bg-purple-900 text-purple-200;
+  }
+
+  .badge-out-for-delivery {
+    @apply badge bg-orange-900 text-orange-200;
+  }
+
+  .badge-delivered {
+    @apply badge bg-green-900 text-green-200;
+  }
+
+  .badge-available {
+    @apply badge bg-green-900 text-green-200;
+  }
+
+  .badge-loaded {
+    @apply badge bg-yellow-900 text-yellow-200;
+  }
+
+  .badge-maintenance {
+    @apply badge bg-red-900 text-red-200;
+  }
+
+  .status-table {
+    @apply w-full border-collapse overflow-hidden text-sm;
+  }
+
+  .status-table thead {
+    @apply border-b border-dark-border bg-slate-800;
+  }
+
+  .status-table th {
+    @apply whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-200;
+  }
+
+  .status-table td {
+    @apply border-b border-dark-border px-4 py-3 text-slate-200;
+  }
+
+  .status-table tbody tr {
+    @apply transition-colors;
+  }
+
+  .status-table tbody tr:hover {
+    @apply bg-slate-800;
+  }
+
+  .page-actions {
+    @apply mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .page-actions-left {
+    @apply flex w-full flex-col gap-3 sm:flex-row sm:items-center;
+  }
+}

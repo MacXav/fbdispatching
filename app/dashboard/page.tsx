@@ -1,0 +1,2569 @@
+'use client';
+
+import { DragEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import MainLayout from '@/components/MainLayout';
+import AutocompleteField, { AutocompleteItem } from '@/components/AutocompleteField';
+import {
+  Check,
+  ClipboardList,
+  Edit2,
+  FileText,
+  GripVertical,
+  Plus,
+  RefreshCw,
+  Truck as TruckIcon,
+  User,
+  X,
+} from 'lucide-react';
+import {
+  createShipment,
+  getCompanies,
+  getShipments,
+  getTrucks,
+  updateShipment,
+  updateShipmentStatus,
+} from '@/lib/database';
+import { supabase } from '@/lib/supabase';
+import { BoardStopType, Company, Shipment, Truck } from '@/types';
+import {
+  BoardDisplaySettings,
+  loadBoardDisplaySettings,
+} from '@/lib/boardDisplaySettings';
+
+interface TruckBoardColumn {
+  truck: Truck;
+  shipments: Shipment[];
+  totalSkids: number;
+  totalWeightLbs: number;
+  remainingSkids: number;
+  remainingWeightLbs: number;
+}
+
+interface DraggedBoardItem {
+  shipmentId: string;
+  sourceColumnKey: string;
+}
+
+interface PickupEditForm {
+  pickup_company_id: string;
+  delivery_company_id: string;
+  board_name: string;
+  board_stop_type: BoardStopType;
+  number_of_skids: string;
+  weight_lbs: string;
+  board_note: string;
+  customs_docs_received: boolean;
+  stays_in_canada: boolean;
+}
+
+const DEFAULT_SKID_CAPACITY = 12;
+const DEFAULT_WEIGHT_CAPACITY_LBS = 15000;
+const PICKUP_COLUMN_KEY = 'pickup';
+
+const emptyPickupEditForm: PickupEditForm = {
+  pickup_company_id: '',
+  delivery_company_id: '',
+  board_name: '',
+  board_stop_type: 'pickup',
+  number_of_skids: '',
+  weight_lbs: '',
+  board_note: '',
+  customs_docs_received: false,
+  stays_in_canada: false,
+};
+
+const BOARD_COLORS = [
+  {
+    header: 'bg-red-300 text-black',
+    body: 'border-red-300/70',
+    accent: 'text-red-200',
+  },
+  {
+    header: 'bg-green-500 text-black',
+    body: 'border-green-500/70',
+    accent: 'text-green-300',
+  },
+  {
+    header: 'bg-pink-200 text-black',
+    body: 'border-pink-200/70',
+    accent: 'text-pink-200',
+  },
+  {
+    header: 'bg-orange-500 text-black',
+    body: 'border-orange-500/70',
+    accent: 'text-orange-300',
+  },
+  {
+    header: 'bg-slate-300 text-black',
+    body: 'border-slate-300/70',
+    accent: 'text-slate-300',
+  },
+  {
+    header: 'bg-rose-500 text-black',
+    body: 'border-rose-500/70',
+    accent: 'text-rose-300',
+  },
+];
+
+const PICKUP_COLUMN_COLOR = {
+  header: 'bg-blue-300 text-black',
+  body: 'border-blue-300/70',
+  accent: 'text-blue-300',
+};
+
+const stopTypeOptions: { value: BoardStopType; label: string }[] = [
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'pickup', label: 'Pickup' },
+  { value: 'pickup_and_delivery', label: 'Pickup + Delivery' },
+  { value: 'cross_dock', label: 'Cross Dock' },
+  { value: 'warehouse', label: 'Warehouse' },
+];
+
+export default function Dashboard() {
+  const [truckColumns, setTruckColumns] = useState<TruckBoardColumn[]>([]);
+  const [unassignedShipments, setUnassignedShipments] = useState<Shipment[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [clearingFinished, setClearingFinished] = useState(false);
+
+  const [assigningShipment, setAssigningShipment] = useState<Shipment | null>(null);
+  const [selectedTruckId, setSelectedTruckId] = useState('');
+
+  const [editingPickup, setEditingPickup] = useState<Shipment | null>(null);
+  const [pickupEditForm, setPickupEditForm] = useState<PickupEditForm>(emptyPickupEditForm);
+  const [savingPickupEdit, setSavingPickupEdit] = useState(false);
+
+  const [draggedItem, setDraggedItem] = useState<DraggedBoardItem | null>(null);
+  const [dragOverShipmentId, setDragOverShipmentId] = useState<string | null>(null);
+  const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null);
+
+  const [boardDisplaySettings, setBoardDisplaySettings] = useState<BoardDisplaySettings>(
+    loadBoardDisplaySettings()
+  );
+
+  useEffect(() => {
+    loadBoardData();
+  }, []);
+
+  useEffect(() => {
+    const refreshSettings = () => {
+      setBoardDisplaySettings(loadBoardDisplaySettings());
+    };
+
+    window.addEventListener('storage', refreshSettings);
+    window.addEventListener('board-display-settings-updated', refreshSettings);
+
+    return () => {
+      window.removeEventListener('storage', refreshSettings);
+      window.removeEventListener('board-display-settings-updated', refreshSettings);
+    };
+  }, []);
+
+  const calculateColumnStats = (truck: Truck, shipments: Shipment[]) => {
+    const capacitySkids = truck.capacity_skids || DEFAULT_SKID_CAPACITY;
+    const maxWeightLbs = truck.max_weight_lbs || DEFAULT_WEIGHT_CAPACITY_LBS;
+
+    const realFreightShipments = shipments.filter(
+      (shipment) => shipment.dispatch_task_type !== 'board_stop'
+    );
+
+    const totalSkids = realFreightShipments.reduce(
+      (sum, shipment) => sum + Number(shipment.number_of_skids || 0),
+      0
+    );
+
+    const totalWeightLbs = realFreightShipments.reduce(
+      (sum, shipment) =>
+        sum + Number(shipment.weight_lbs || shipment.weight_kg || 0),
+      0
+    );
+
+    return {
+      truck: {
+        ...truck,
+        capacity_skids: capacitySkids,
+        max_weight_lbs: maxWeightLbs,
+      },
+      totalSkids,
+      totalWeightLbs,
+      remainingSkids: capacitySkids - totalSkids,
+      remainingWeightLbs: maxWeightLbs - totalWeightLbs,
+    };
+  };
+
+  const rebuildTruckColumns = (columns: TruckBoardColumn[]) => {
+    return columns.map((column) => {
+      const stats = calculateColumnStats(column.truck, column.shipments);
+
+      return {
+        ...column,
+        truck: stats.truck,
+        totalSkids: stats.totalSkids,
+        totalWeightLbs: stats.totalWeightLbs,
+        remainingSkids: stats.remainingSkids,
+        remainingWeightLbs: stats.remainingWeightLbs,
+      };
+    });
+  };
+
+  const loadBoardData = async () => {
+    try {
+      setLoading(true);
+
+      const [trucksData, shipmentsData, companiesData] = await Promise.all([
+        getTrucks(),
+        getShipments(),
+        getCompanies(),
+      ]);
+
+      setCompanies(companiesData);
+
+      const columns = trucksData.map((truck) => {
+        const validShipments = shipmentsData
+          .filter((shipment) => shipment.status !== 'delivered')
+          .filter((shipment) => shipment.assigned_truck_id === truck.id)
+          .sort(sortShipmentsForBoard);
+
+        const stats = calculateColumnStats(truck, validShipments);
+
+        return {
+          truck: stats.truck,
+          shipments: validShipments,
+          totalSkids: stats.totalSkids,
+          totalWeightLbs: stats.totalWeightLbs,
+          remainingSkids: stats.remainingSkids,
+          remainingWeightLbs: stats.remainingWeightLbs,
+        };
+      });
+
+      const pickups = shipmentsData
+        .filter((shipment) => !shipment.assigned_truck_id)
+        .filter((shipment) => shipment.status === 'pending')
+        .filter((shipment) => shipment.dispatch_task_type !== 'board_stop')
+        .sort(sortShipmentsForBoard);
+
+      setTruckColumns(columns);
+      setUnassignedShipments(pickups);
+    } catch (error) {
+      console.error('Error loading truck board:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const allBoardShipments = useMemo(() => {
+    return [
+      ...unassignedShipments,
+      ...truckColumns.flatMap((column) => column.shipments),
+    ];
+  }, [unassignedShipments, truckColumns]);
+
+  const companyItems: AutocompleteItem[] = useMemo(() => {
+    return companies
+      .map((company) => ({
+        id: company.id,
+        label: company.name,
+        description: [
+          company.address,
+          company.city,
+          company.postal_code,
+          company.contact_name,
+          company.contact_phone,
+        ]
+          .filter(Boolean)
+          .join(' • '),
+        keywords: [
+          company.name,
+          company.address,
+          company.city,
+          company.postal_code,
+          company.contact_name,
+          company.contact_phone,
+          company.notes,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [companies]);
+
+  const truckItemsForAssignment: AutocompleteItem[] = useMemo(() => {
+    if (!assigningShipment) return [];
+
+    const shipmentSkids = Number(assigningShipment.number_of_skids || 0);
+    const shipmentWeight = Number(
+      assigningShipment.weight_lbs || assigningShipment.weight_kg || 0
+    );
+
+    return truckColumns
+      .filter((column) => {
+        const truckUsable =
+          column.truck.status === 'available' ||
+          column.truck.status === 'loaded' ||
+          column.truck.status === 'out_for_delivery';
+
+        const hasSkidSpace =
+          shipmentSkids <= 0 || column.remainingSkids >= shipmentSkids;
+
+        const hasWeightSpace =
+          shipmentWeight <= 0 || column.remainingWeightLbs >= shipmentWeight;
+
+        return truckUsable && hasSkidSpace && hasWeightSpace;
+      })
+      .map((column) => ({
+        id: column.truck.id,
+        label: `${column.truck.truck_number} — ${column.truck.driver_name || 'Unassigned'}`,
+        description: `${column.remainingSkids} skids left • ${column.remainingWeightLbs.toLocaleString()} lbs left • ${column.truck.current_route_area || 'No area set'}`,
+        keywords: [
+          column.truck.truck_number,
+          column.truck.driver_name,
+          column.truck.current_route_area,
+          column.truck.status,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      }));
+  }, [assigningShipment, truckColumns]);
+
+  const selectedPickupCompany = companies.find(
+    (company) => company.id === pickupEditForm.pickup_company_id
+  );
+
+  const selectedDeliveryCompany = companies.find(
+    (company) => company.id === pickupEditForm.delivery_company_id
+  );
+
+  const getColumnShipments = (columnKey: string) => {
+    if (columnKey === PICKUP_COLUMN_KEY) {
+      return unassignedShipments;
+    }
+
+    const column = truckColumns.find((item) => item.truck.id === columnKey);
+
+    return column?.shipments || [];
+  };
+
+  const updateShipmentLocally = (shipmentId: string, updates: Partial<Shipment>) => {
+    setUnassignedShipments((current) =>
+      current.map((shipment) =>
+        shipment.id === shipmentId ? { ...shipment, ...updates } : shipment
+      )
+    );
+
+    setTruckColumns((current) =>
+      rebuildTruckColumns(
+        current.map((column) => ({
+          ...column,
+          shipments: column.shipments.map((shipment) =>
+            shipment.id === shipmentId ? { ...shipment, ...updates } : shipment
+          ),
+        }))
+      )
+    );
+  };
+
+  const addShipmentToTruckLocally = (truckId: string, shipment: Shipment) => {
+    setTruckColumns((current) =>
+      rebuildTruckColumns(
+        current.map((column) => {
+          if (column.truck.id !== truckId) {
+            return column;
+          }
+
+          return {
+            ...column,
+            shipments: [
+              ...column.shipments,
+              {
+                ...shipment,
+                assigned_truck_id: truckId,
+              },
+            ],
+          };
+        })
+      )
+    );
+  };
+
+  const applyMoveLocally = ({
+    shipmentId,
+    sourceColumnKey,
+    targetColumnKey,
+    targetBeforeShipmentId,
+    assignedAt,
+  }: {
+    shipmentId: string;
+    sourceColumnKey: string;
+    targetColumnKey: string;
+    targetBeforeShipmentId: string | null;
+    assignedAt: string;
+  }) => {
+    const movedShipment = allBoardShipments.find((shipment) => shipment.id === shipmentId);
+
+    if (!movedShipment) {
+      return;
+    }
+
+    const movedToPickup = targetColumnKey === PICKUP_COLUMN_KEY;
+
+    const updatedMovedShipment: Shipment = {
+      ...movedShipment,
+      assigned_truck_id: movedToPickup ? null : targetColumnKey,
+      assigned_at: movedToPickup ? null : assignedAt,
+      route_completed: false,
+      route_completed_at: null,
+      route_completed_by: null,
+    };
+
+    let nextUnassigned = unassignedShipments.filter(
+      (shipment) => shipment.id !== shipmentId
+    );
+
+    let nextColumns = truckColumns.map((column) => ({
+      ...column,
+      shipments: column.shipments.filter((shipment) => shipment.id !== shipmentId),
+    }));
+
+    if (movedToPickup) {
+      if (updatedMovedShipment.dispatch_task_type !== 'board_stop') {
+        const beforeIndex = targetBeforeShipmentId
+          ? nextUnassigned.findIndex((shipment) => shipment.id === targetBeforeShipmentId)
+          : -1;
+
+        if (beforeIndex >= 0) {
+          nextUnassigned.splice(beforeIndex, 0, updatedMovedShipment);
+        } else {
+          nextUnassigned.push(updatedMovedShipment);
+        }
+      }
+    } else {
+      nextColumns = nextColumns.map((column) => {
+        if (column.truck.id !== targetColumnKey) {
+          return column;
+        }
+
+        const nextShipments = [...column.shipments];
+        const beforeIndex = targetBeforeShipmentId
+          ? nextShipments.findIndex((shipment) => shipment.id === targetBeforeShipmentId)
+          : -1;
+
+        if (beforeIndex >= 0) {
+          nextShipments.splice(beforeIndex, 0, updatedMovedShipment);
+        } else {
+          nextShipments.push(updatedMovedShipment);
+        }
+
+        return {
+          ...column,
+          shipments: nextShipments,
+        };
+      });
+    }
+
+    nextUnassigned = nextUnassigned.map((shipment, index) => ({
+      ...shipment,
+      board_sort_order: (index + 1) * 10,
+    }));
+
+    nextColumns = nextColumns.map((column) => ({
+      ...column,
+      shipments: column.shipments.map((shipment, index) => ({
+        ...shipment,
+        board_sort_order: (index + 1) * 10,
+      })),
+    }));
+
+    setUnassignedShipments(nextUnassigned);
+    setTruckColumns(rebuildTruckColumns(nextColumns));
+  };
+
+  const checkTruckCapacityBeforeMove = (
+    shipment: Shipment,
+    sourceColumnKey: string,
+    targetColumnKey: string
+  ) => {
+    if (
+      shipment.dispatch_task_type === 'board_stop' ||
+      targetColumnKey === PICKUP_COLUMN_KEY ||
+      sourceColumnKey === targetColumnKey
+    ) {
+      return true;
+    }
+
+    const targetColumn = truckColumns.find((column) => column.truck.id === targetColumnKey);
+
+    if (!targetColumn) {
+      alert('Target truck was not found.');
+      return false;
+    }
+
+    const shipmentSkids = Number(shipment.number_of_skids || 0);
+    const shipmentWeight = Number(shipment.weight_lbs || shipment.weight_kg || 0);
+
+    const currentTargetShipments = targetColumn.shipments
+      .filter((item) => item.id !== shipment.id)
+      .filter((item) => item.dispatch_task_type !== 'board_stop');
+
+    const targetSkids = currentTargetShipments.reduce(
+      (sum, item) => sum + Number(item.number_of_skids || 0),
+      0
+    );
+
+    const targetWeight = currentTargetShipments.reduce(
+      (sum, item) => sum + Number(item.weight_lbs || item.weight_kg || 0),
+      0
+    );
+
+    if (shipmentSkids > 0 && targetSkids + shipmentSkids > targetColumn.truck.capacity_skids) {
+      alert(
+        `${targetColumn.truck.truck_number} does not have enough skid space for this move.`
+      );
+      return false;
+    }
+
+    if (
+      shipmentWeight > 0 &&
+      targetWeight + shipmentWeight > targetColumn.truck.max_weight_lbs
+    ) {
+      alert(
+        `${targetColumn.truck.truck_number} does not have enough weight capacity for this move.`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const saveBoardMove = async ({
+    shipmentId,
+    sourceColumnKey,
+    targetColumnKey,
+    targetBeforeShipmentId,
+  }: {
+    shipmentId: string;
+    sourceColumnKey: string;
+    targetColumnKey: string;
+    targetBeforeShipmentId: string | null;
+  }) => {
+    const movedShipment = allBoardShipments.find((shipment) => shipment.id === shipmentId);
+
+    if (!movedShipment) {
+      handleDragEnd();
+      return;
+    }
+
+    if (
+      movedShipment.dispatch_task_type === 'board_stop' &&
+      targetColumnKey === PICKUP_COLUMN_KEY
+    ) {
+      alert('Route notes must stay on a truck route.');
+      handleDragEnd();
+      return;
+    }
+
+    if (!checkTruckCapacityBeforeMove(movedShipment, sourceColumnKey, targetColumnKey)) {
+      handleDragEnd();
+      return;
+    }
+
+    const previousTruckColumns = truckColumns;
+    const previousUnassignedShipments = unassignedShipments;
+
+    const sourceIds = getColumnShipments(sourceColumnKey)
+      .map((shipment) => shipment.id)
+      .filter((id) => id !== shipmentId);
+
+    const targetIds =
+      sourceColumnKey === targetColumnKey
+        ? sourceIds
+        : getColumnShipments(targetColumnKey)
+            .map((shipment) => shipment.id)
+            .filter((id) => id !== shipmentId);
+
+    if (targetBeforeShipmentId) {
+      const targetIndex = targetIds.indexOf(targetBeforeShipmentId);
+
+      if (targetIndex === -1) {
+        targetIds.push(shipmentId);
+      } else {
+        targetIds.splice(targetIndex, 0, shipmentId);
+      }
+    } else {
+      targetIds.push(shipmentId);
+    }
+
+    const now = new Date().toISOString();
+
+    applyMoveLocally({
+      shipmentId,
+      sourceColumnKey,
+      targetColumnKey,
+      targetBeforeShipmentId,
+      assignedAt: now,
+    });
+
+    try {
+      setUpdatingId('reordering');
+
+      await syncTruckAssignment({
+        shipmentId,
+        targetColumnKey,
+        assignedAt: now,
+      });
+
+      if (sourceColumnKey !== targetColumnKey) {
+        for (let index = 0; index < sourceIds.length; index++) {
+          await updateShipment(sourceIds[index], {
+            board_sort_order: (index + 1) * 10,
+          } as Partial<Shipment>);
+        }
+      }
+
+      for (let index = 0; index < targetIds.length; index++) {
+        const id = targetIds[index];
+
+        if (id === shipmentId) {
+          await updateShipment(id, {
+            assigned_truck_id:
+              targetColumnKey === PICKUP_COLUMN_KEY ? null : targetColumnKey,
+            assigned_at: targetColumnKey === PICKUP_COLUMN_KEY ? null : now,
+            route_completed: false,
+            route_completed_at: null,
+            route_completed_by: null,
+            board_sort_order: (index + 1) * 10,
+          } as Partial<Shipment>);
+        } else {
+          await updateShipment(id, {
+            board_sort_order: (index + 1) * 10,
+          } as Partial<Shipment>);
+        }
+      }
+    } catch (error) {
+      console.error('Error moving shipment on board:', error);
+      setTruckColumns(previousTruckColumns);
+      setUnassignedShipments(previousUnassignedShipments);
+      alert('Could not move shipment. The board was restored.');
+    } finally {
+      setUpdatingId(null);
+      handleDragEnd();
+    }
+  };
+
+  const syncTruckAssignment = async ({
+    shipmentId,
+    targetColumnKey,
+    assignedAt,
+  }: {
+    shipmentId: string;
+    targetColumnKey: string;
+    assignedAt: string;
+  }) => {
+    const deleteResult = await supabase
+      .from('truck_assignments')
+      .delete()
+      .eq('shipment_id', shipmentId);
+
+    if (deleteResult.error) {
+      throw deleteResult.error;
+    }
+
+    if (targetColumnKey === PICKUP_COLUMN_KEY) {
+      return;
+    }
+
+    const insertResult = await supabase.from('truck_assignments').insert([
+      {
+        shipment_id: shipmentId,
+        truck_id: targetColumnKey,
+        assigned_at: assignedAt,
+      },
+    ]);
+
+    if (insertResult.error) {
+      throw insertResult.error;
+    }
+  };
+
+  const handleCreateTypedRouteStop = async (truck: Truck, text: string) => {
+    const cleanedText = text.trim();
+
+    if (!cleanedText) {
+      return;
+    }
+
+    try {
+      setUpdatingId(`typed-stop-${truck.id}`);
+
+      const currentColumn = truckColumns.find((column) => column.truck.id === truck.id);
+      const nextSortOrder = ((currentColumn?.shipments.length || 0) + 1) * 10;
+      const now = new Date().toISOString();
+
+      const createdStop = await createShipment({
+        work_order_id: null,
+        work_order_number: null,
+
+        customer_company_name: null,
+        bill_to_company_name: null,
+        customer_reference: null,
+        pickup_reference: null,
+        delivery_reference: null,
+
+        service_type: 'other',
+        priority_level: 'normal',
+
+        internal_notes: null,
+
+        ready_to_invoice: false,
+        invoice_status: 'do_not_invoice',
+
+        pod_received: false,
+        pod_received_at: null,
+
+        dispatch_task_type: 'board_stop',
+        dispatch_status: 'open',
+
+        pickup_company_name: null,
+        pickup_address: null,
+        pickup_city: null,
+        pickup_postal_code: null,
+        pickup_date: null,
+        pickup_time: null,
+        pickup_contact_name: null,
+        pickup_contact_phone: null,
+
+        delivery_company_name: null,
+        delivery_address: null,
+        delivery_city: null,
+        delivery_postal_code: null,
+        delivery_date: null,
+        delivery_time: null,
+        delivery_contact_name: null,
+        delivery_contact_phone: null,
+
+        number_of_skids: null,
+        weight_lbs: null,
+        weight_kg: null,
+
+        dimensions: null,
+        notes: null,
+
+        board_name: cleanedText,
+        board_stop_type: 'warehouse',
+        board_note: null,
+        board_sort_order: nextSortOrder,
+
+        customs_docs_received: false,
+        stays_in_canada: false,
+
+        route_completed: false,
+        route_completed_at: null,
+        route_completed_by: null,
+
+        status: 'pending',
+        assigned_truck_id: truck.id,
+        assigned_at: now,
+      } as Omit<Shipment, 'id' | 'created_at' | 'updated_at'>);
+
+      if (!createdStop) {
+        alert('Could not add route note.');
+        return;
+      }
+
+      await updateShipment(createdStop.id, {
+        work_order_number: null,
+        work_order_id: null,
+        customer_reference: null,
+        pickup_reference: null,
+        delivery_reference: null,
+        customer_company_name: null,
+        bill_to_company_name: null,
+      } as Partial<Shipment>);
+
+      const cleanCreatedStop: Shipment = {
+        ...createdStop,
+        work_order_number: null,
+        work_order_id: null,
+        customer_reference: null,
+        pickup_reference: null,
+        delivery_reference: null,
+        customer_company_name: null,
+        bill_to_company_name: null,
+        dispatch_task_type: 'board_stop',
+        board_name: cleanedText,
+        assigned_truck_id: truck.id,
+        assigned_at: now,
+        board_sort_order: nextSortOrder,
+      };
+
+      addShipmentToTruckLocally(truck.id, cleanCreatedStop);
+
+      const insertResult = await supabase.from('truck_assignments').insert([
+        {
+          shipment_id: createdStop.id,
+          truck_id: truck.id,
+          assigned_at: now,
+        },
+      ]);
+
+      if (insertResult.error) {
+        console.error('Error creating truck assignment for typed route stop:', insertResult.error);
+      }
+    } catch (error) {
+      console.error('Error creating typed route stop:', error);
+      alert('Could not add route note.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleDragStart = (
+    event: DragEvent<HTMLDivElement>,
+    shipment: Shipment,
+    columnKey: string
+  ) => {
+    setDraggedItem({
+      shipmentId: shipment.id,
+      sourceColumnKey: columnKey,
+    });
+
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(
+      'text/plain',
+      JSON.stringify({
+        shipmentId: shipment.id,
+        sourceColumnKey: columnKey,
+      })
+    );
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverShipmentId(null);
+    setDragOverColumnKey(null);
+  };
+
+  const handleDropOnShipment = async (
+    event: DragEvent<HTMLDivElement>,
+    targetShipment: Shipment,
+    targetColumnKey: string
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!draggedItem) return;
+
+    if (draggedItem.shipmentId === targetShipment.id) {
+      handleDragEnd();
+      return;
+    }
+
+    await saveBoardMove({
+      shipmentId: draggedItem.shipmentId,
+      sourceColumnKey: draggedItem.sourceColumnKey,
+      targetColumnKey,
+      targetBeforeShipmentId: targetShipment.id,
+    });
+  };
+
+  const handleDropOnColumnEnd = async (
+    event: DragEvent<HTMLDivElement>,
+    targetColumnKey: string
+  ) => {
+    event.preventDefault();
+
+    if (!draggedItem) return;
+
+    await saveBoardMove({
+      shipmentId: draggedItem.shipmentId,
+      sourceColumnKey: draggedItem.sourceColumnKey,
+      targetColumnKey,
+      targetBeforeShipmentId: null,
+    });
+  };
+
+  const handleToggleRouteComplete = async (shipment: Shipment, truck: Truck) => {
+    const previousCompleted = shipment.route_completed;
+    const previousCompletedAt = shipment.route_completed_at;
+    const previousCompletedBy = shipment.route_completed_by;
+
+    const nextCompleted = !shipment.route_completed;
+
+    const localUpdates: Partial<Shipment> = {
+      route_completed: nextCompleted,
+      route_completed_at: nextCompleted ? new Date().toISOString() : null,
+      route_completed_by: nextCompleted ? truck.driver_name || truck.truck_number : null,
+    };
+
+    updateShipmentLocally(shipment.id, localUpdates);
+
+    try {
+      setUpdatingId(shipment.id);
+
+      const updated = await updateShipment(shipment.id, localUpdates);
+
+      if (!updated) {
+        updateShipmentLocally(shipment.id, {
+          route_completed: previousCompleted,
+          route_completed_at: previousCompletedAt,
+          route_completed_by: previousCompletedBy,
+        });
+
+        alert('Could not update FIN status.');
+      }
+    } catch (error) {
+      console.error('Error updating FIN status:', error);
+
+      updateShipmentLocally(shipment.id, {
+        route_completed: previousCompleted,
+        route_completed_at: previousCompletedAt,
+        route_completed_by: previousCompletedBy,
+      });
+
+      alert('Could not update FIN status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleClearFinishedStops = async () => {
+    const finishedShipments = truckColumns.flatMap((column) =>
+      column.shipments.filter((shipment) => shipment.route_completed)
+    );
+
+    if (finishedShipments.length === 0) {
+      alert('No finished stops to clear.');
+      return;
+    }
+
+    if (
+      !confirm(
+        `Clear ${finishedShipments.length} finished stop(s) from the board? They will be marked delivered and removed from the active board.`
+      )
+    ) {
+      return;
+    }
+
+    const previousTruckColumns = truckColumns;
+
+    setTruckColumns((current) =>
+      rebuildTruckColumns(
+        current.map((column) => ({
+          ...column,
+          shipments: column.shipments.filter(
+            (shipment) => !shipment.route_completed
+          ),
+        }))
+      )
+    );
+
+    try {
+      setClearingFinished(true);
+
+      for (const shipment of finishedShipments) {
+        await updateShipmentStatus(shipment.id, 'delivered');
+      }
+    } catch (error) {
+      console.error('Error clearing finished stops:', error);
+      setTruckColumns(previousTruckColumns);
+      alert('Could not clear finished stops. The board was restored.');
+    } finally {
+      setClearingFinished(false);
+    }
+  };
+
+  const handleToggleDocs = async (shipment: Shipment) => {
+    const previousValue = shipment.customs_docs_received;
+    const nextValue = !shipment.customs_docs_received;
+
+    updateShipmentLocally(shipment.id, {
+      customs_docs_received: nextValue,
+    });
+
+    try {
+      setUpdatingId(shipment.id);
+
+      const updated = await updateShipment(shipment.id, {
+        customs_docs_received: nextValue,
+      } as Partial<Shipment>);
+
+      if (!updated) {
+        updateShipmentLocally(shipment.id, {
+          customs_docs_received: previousValue,
+        });
+
+        alert('Could not update customs docs status.');
+      }
+    } catch (error) {
+      console.error('Error updating customs docs:', error);
+
+      updateShipmentLocally(shipment.id, {
+        customs_docs_received: previousValue,
+      });
+
+      alert('Could not update customs docs status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleToggleCanada = async (shipment: Shipment) => {
+    const previousValue = shipment.stays_in_canada;
+    const nextValue = !shipment.stays_in_canada;
+
+    updateShipmentLocally(shipment.id, {
+      stays_in_canada: nextValue,
+    });
+
+    try {
+      setUpdatingId(shipment.id);
+
+      const updated = await updateShipment(shipment.id, {
+        stays_in_canada: nextValue,
+      } as Partial<Shipment>);
+
+      if (!updated) {
+        updateShipmentLocally(shipment.id, {
+          stays_in_canada: previousValue,
+        });
+
+        alert('Could not update Canada status.');
+      }
+    } catch (error) {
+      console.error('Error updating Canada status:', error);
+
+      updateShipmentLocally(shipment.id, {
+        stays_in_canada: previousValue,
+      });
+
+      alert('Could not update Canada status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleSaveBoardNote = async (shipment: Shipment, boardNote: string) => {
+    const cleanedNote = boardNote.trim();
+    const previousNote = shipment.board_note || null;
+    const nextNote = cleanedNote === '' ? null : cleanedNote;
+
+    if (previousNote === nextNote) {
+      return;
+    }
+
+    updateShipmentLocally(shipment.id, {
+      board_note: nextNote,
+    });
+
+    try {
+      setUpdatingId(shipment.id);
+
+      const updated = await updateShipment(shipment.id, {
+        board_note: nextNote,
+      } as Partial<Shipment>);
+
+      if (!updated) {
+        updateShipmentLocally(shipment.id, {
+          board_note: previousNote,
+        });
+
+        alert('Could not save board note.');
+      }
+    } catch (error) {
+      console.error('Error saving board note:', error);
+
+      updateShipmentLocally(shipment.id, {
+        board_note: previousNote,
+      });
+
+      alert('Could not save board note.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openAssignModal = (shipment: Shipment) => {
+    setAssigningShipment(shipment);
+    setSelectedTruckId('');
+  };
+
+  const closeAssignModal = () => {
+    setAssigningShipment(null);
+    setSelectedTruckId('');
+  };
+
+  const handleAssignPickup = async () => {
+    if (!assigningShipment) return;
+
+    if (!selectedTruckId) {
+      alert('Type and select a truck first.');
+      return;
+    }
+
+    try {
+      setUpdatingId(assigningShipment.id);
+
+      await saveBoardMove({
+        shipmentId: assigningShipment.id,
+        sourceColumnKey: PICKUP_COLUMN_KEY,
+        targetColumnKey: selectedTruckId,
+        targetBeforeShipmentId: null,
+      });
+
+      closeAssignModal();
+    } catch (error) {
+      console.error('Error assigning pickup:', error);
+      alert('Could not assign pickup to truck.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openPickupEditModal = (shipment: Shipment) => {
+    const pickupCompany = companies.find(
+      (company) =>
+        company.name.trim().toLowerCase() ===
+        (shipment.pickup_company_name || '').trim().toLowerCase()
+    );
+
+    const deliveryCompany = companies.find(
+      (company) =>
+        company.name.trim().toLowerCase() ===
+        (shipment.delivery_company_name || '').trim().toLowerCase()
+    );
+
+    setEditingPickup(shipment);
+    setPickupEditForm({
+      pickup_company_id: pickupCompany?.id || '',
+      delivery_company_id: deliveryCompany?.id || '',
+      board_name: shipment.board_name || '',
+      board_stop_type: (shipment.board_stop_type as BoardStopType) || 'pickup',
+      number_of_skids:
+        shipment.number_of_skids === null || shipment.number_of_skids === undefined
+          ? ''
+          : String(shipment.number_of_skids),
+      weight_lbs:
+        shipment.weight_lbs === null || shipment.weight_lbs === undefined
+          ? shipment.weight_kg === null || shipment.weight_kg === undefined
+            ? ''
+            : String(shipment.weight_kg)
+          : String(shipment.weight_lbs),
+      board_note: shipment.board_note || '',
+      customs_docs_received: Boolean(shipment.customs_docs_received),
+      stays_in_canada: Boolean(shipment.stays_in_canada),
+    });
+  };
+
+  const closePickupEditModal = () => {
+    setEditingPickup(null);
+    setPickupEditForm(emptyPickupEditForm);
+  };
+
+  const numberValue = (value: string) => {
+    if (value.trim() === '') return null;
+
+    const parsed = Number(value);
+
+    if (Number.isNaN(parsed)) {
+      return null;
+    }
+
+    return parsed;
+  };
+
+  const companyValue = (value?: string | null) => {
+    if (!value || value.trim() === '') return null;
+    return value.trim();
+  };
+
+  const handleSavePickupEdit = async () => {
+    if (!editingPickup) return;
+
+    const previousShipment = editingPickup;
+
+    const localUpdates: Partial<Shipment> = {
+      pickup_company_name: selectedPickupCompany?.name || null,
+      pickup_address: companyValue(selectedPickupCompany?.address),
+      pickup_city: companyValue(selectedPickupCompany?.city),
+      pickup_postal_code: companyValue(selectedPickupCompany?.postal_code),
+      pickup_contact_name: companyValue(selectedPickupCompany?.contact_name),
+      pickup_contact_phone: companyValue(selectedPickupCompany?.contact_phone),
+
+      delivery_company_name: selectedDeliveryCompany?.name || null,
+      delivery_address: companyValue(selectedDeliveryCompany?.address),
+      delivery_city: companyValue(selectedDeliveryCompany?.city),
+      delivery_postal_code: companyValue(selectedDeliveryCompany?.postal_code),
+      delivery_contact_name: companyValue(selectedDeliveryCompany?.contact_name),
+      delivery_contact_phone: companyValue(selectedDeliveryCompany?.contact_phone),
+
+      board_name: pickupEditForm.board_name.trim() || null,
+      board_stop_type: pickupEditForm.board_stop_type,
+      number_of_skids: numberValue(pickupEditForm.number_of_skids),
+      weight_lbs: numberValue(pickupEditForm.weight_lbs),
+      board_note: pickupEditForm.board_note.trim() || null,
+      customs_docs_received: pickupEditForm.customs_docs_received,
+      stays_in_canada: pickupEditForm.stays_in_canada,
+    };
+
+    updateShipmentLocally(editingPickup.id, localUpdates);
+
+    try {
+      setSavingPickupEdit(true);
+
+      const updated = await updateShipment(editingPickup.id, localUpdates);
+
+      if (!updated) {
+        updateShipmentLocally(editingPickup.id, previousShipment);
+        alert('Could not save pickup changes.');
+        return;
+      }
+
+      closePickupEditModal();
+    } catch (error) {
+      console.error('Error saving pickup edit:', error);
+      updateShipmentLocally(editingPickup.id, previousShipment);
+      alert('Could not save pickup changes.');
+    } finally {
+      setSavingPickupEdit(false);
+    }
+  };
+
+  return (
+    <MainLayout>
+      <div className="flex h-full w-full flex-col overflow-hidden bg-black">
+        <div className="flex h-[48px] flex-shrink-0 items-center justify-between border-b border-dark-border bg-dark-bg px-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-black text-white">
+              Truck Board
+            </h1>
+            <p className="truncate text-[11px] text-slate-400">
+              Drag freight, type route notes, and track what each driver is doing
+            </p>
+          </div>
+
+          <div className="flex flex-shrink-0 gap-1.5">
+            <Link
+              href="/settings"
+              className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-white hover:bg-slate-600"
+            >
+              Board Settings
+            </Link>
+
+            <button
+              type="button"
+              onClick={loadBoardData}
+              className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-white hover:bg-slate-600 disabled:opacity-60"
+              disabled={loading}
+            >
+              <RefreshCw className={`mr-1 inline h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearFinishedStops}
+              className="rounded bg-red-700 px-2 py-1 text-xs font-bold text-white hover:bg-red-600 disabled:opacity-60"
+              disabled={clearingFinished}
+            >
+              {clearingFinished ? 'Clearing...' : 'Clear FIN'}
+            </button>
+
+            <Link
+              href="/shipments"
+              className="rounded bg-blue-600 px-2 py-1 text-xs font-bold text-white hover:bg-blue-500"
+            >
+              <Plus className="mr-1 inline h-3 w-3" />
+              Add
+            </Link>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-1 items-center justify-center bg-dark-bg">
+            <p className="text-slate-400">Loading truck board...</p>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 bg-black p-0">
+            <div
+              className="grid h-full w-full gap-0"
+              style={{
+                gridTemplateColumns: `repeat(${truckColumns.length + 1}, minmax(0, 1fr))`,
+              }}
+            >
+              {truckColumns.map((column, index) => (
+                <TruckBoardColumnCard
+                  key={column.truck.id}
+                  column={column}
+                  columnKey={column.truck.id}
+                  color={BOARD_COLORS[index % BOARD_COLORS.length]}
+                  boardDisplaySettings={boardDisplaySettings}
+                  onToggleRouteComplete={handleToggleRouteComplete}
+                  onSaveBoardNote={handleSaveBoardNote}
+                  onCreateTypedRouteStop={handleCreateTypedRouteStop}
+                  updatingId={updatingId}
+                  draggedItem={draggedItem}
+                  dragOverShipmentId={dragOverShipmentId}
+                  dragOverColumnKey={dragOverColumnKey}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragOverColumn={(columnKey) => setDragOverColumnKey(columnKey)}
+                  onDragOverShipment={(shipmentId, columnKey) => {
+                    setDragOverShipmentId(shipmentId);
+                    setDragOverColumnKey(columnKey);
+                  }}
+                  onDropOnShipment={handleDropOnShipment}
+                  onDropOnColumnEnd={handleDropOnColumnEnd}
+                />
+              ))}
+
+              <PickupBoardColumn
+                shipments={unassignedShipments}
+                columnKey={PICKUP_COLUMN_KEY}
+                onToggleDocs={handleToggleDocs}
+                onToggleCanada={handleToggleCanada}
+                onAssign={openAssignModal}
+                onEdit={openPickupEditModal}
+                updatingId={updatingId}
+                draggedItem={draggedItem}
+                dragOverShipmentId={dragOverShipmentId}
+                dragOverColumnKey={dragOverColumnKey}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOverColumn={(columnKey) => setDragOverColumnKey(columnKey)}
+                onDragOverShipment={(shipmentId, columnKey) => {
+                  setDragOverShipmentId(shipmentId);
+                  setDragOverColumnKey(columnKey);
+                }}
+                onDropOnShipment={handleDropOnShipment}
+                onDropOnColumnEnd={handleDropOnColumnEnd}
+              />
+            </div>
+          </div>
+        )}
+
+        {assigningShipment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-xl rounded-xl border border-dark-border bg-dark-card p-6 shadow-2xl">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    Assign Pickup to Truck
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    {displayValue(assigningShipment.pickup_company_name)} •{' '}
+                    {displayLocation(assigningShipment.pickup_address, assigningShipment.pickup_city)}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeAssignModal}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <AutocompleteField
+                label="Truck"
+                placeholder="Type Unit 11, driver, area, rental..."
+                items={truckItemsForAssignment}
+                selectedId={selectedTruckId}
+                onSelect={(item) => setSelectedTruckId(item.id)}
+                onClear={() => setSelectedTruckId('')}
+                emptyMessage="No truck found with enough capacity."
+              />
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeAssignModal}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAssignPickup}
+                  className="btn-primary"
+                  disabled={updatingId === assigningShipment.id}
+                >
+                  {updatingId === assigningShipment.id ? 'Assigning...' : 'Assign Pickup'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {editingPickup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-6 shadow-2xl">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    Edit Pickup
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Change the pickup without leaving the board.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closePickupEditModal}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <AutocompleteField
+                      label="Pickup From"
+                      placeholder="Type pickup company..."
+                      items={companyItems}
+                      selectedId={pickupEditForm.pickup_company_id}
+                      onSelect={(item) =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          pickup_company_id: item.id,
+                        })
+                      }
+                      onClear={() =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          pickup_company_id: '',
+                        })
+                      }
+                      emptyMessage="No company found."
+                    />
+
+                    {selectedPickupCompany && (
+                      <SmallCompanyPreview company={selectedPickupCompany} />
+                    )}
+                  </div>
+
+                  <div>
+                    <AutocompleteField
+                      label="Going To"
+                      placeholder="Type receiver/warehouse..."
+                      items={companyItems}
+                      selectedId={pickupEditForm.delivery_company_id}
+                      onSelect={(item) =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          delivery_company_id: item.id,
+                        })
+                      }
+                      onClear={() =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          delivery_company_id: '',
+                        })
+                      }
+                      emptyMessage="No company found."
+                    />
+
+                    {selectedDeliveryCompany && (
+                      <SmallCompanyPreview company={selectedDeliveryCompany} />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                    Board Name
+                  </label>
+
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Optional board override"
+                    value={pickupEditForm.board_name}
+                    onChange={(event) =>
+                      setPickupEditForm({
+                        ...pickupEditForm,
+                        board_name: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-slate-300">
+                    Stop Type
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {stopTypeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setPickupEditForm({
+                            ...pickupEditForm,
+                            board_stop_type: option.value,
+                          })
+                        }
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                          pickupEditForm.board_stop_type === option.value
+                            ? 'border-blue-500 bg-blue-950 text-blue-100'
+                            : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                      Skids
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      className="input-field"
+                      value={pickupEditForm.number_of_skids}
+                      onChange={(event) =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          number_of_skids: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                      Weight LBS
+                    </label>
+
+                    <input
+                      type="number"
+                      min="0"
+                      max="15000"
+                      className="input-field"
+                      value={pickupEditForm.weight_lbs}
+                      onChange={(event) =>
+                        setPickupEditForm({
+                          ...pickupEditForm,
+                          weight_lbs: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                    Board Note
+                  </label>
+
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Call with ETA, No Bury, etc."
+                    value={pickupEditForm.board_note}
+                    onChange={(event) =>
+                      setPickupEditForm({
+                        ...pickupEditForm,
+                        board_note: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPickupEditForm({
+                        ...pickupEditForm,
+                        customs_docs_received: !pickupEditForm.customs_docs_received,
+                      })
+                    }
+                    className={`rounded-lg border px-4 py-3 text-left font-semibold ${
+                      pickupEditForm.customs_docs_received
+                        ? 'border-green-700 bg-green-950 text-green-200'
+                        : 'border-red-700 bg-red-950 text-red-200'
+                    }`}
+                  >
+                    DOC: {pickupEditForm.customs_docs_received ? 'Received' : 'Not Received'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPickupEditForm({
+                        ...pickupEditForm,
+                        stays_in_canada: !pickupEditForm.stays_in_canada,
+                      })
+                    }
+                    className={`rounded-lg border px-4 py-3 text-left font-semibold ${
+                      pickupEditForm.stays_in_canada
+                        ? 'border-red-600 bg-red-900 text-white'
+                        : 'border-slate-700 bg-slate-900 text-slate-300'
+                    }`}
+                  >
+                    CAN: {pickupEditForm.stays_in_canada ? 'Canada' : 'Not Canada'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closePickupEditModal}
+                  className="btn-secondary"
+                  disabled={savingPickupEdit}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSavePickupEdit}
+                  className="btn-primary"
+                  disabled={savingPickupEdit}
+                >
+                  {savingPickupEdit ? 'Saving...' : 'Save Pickup'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
+
+interface BoardColor {
+  header: string;
+  body: string;
+  accent: string;
+}
+
+interface TruckBoardColumnCardProps {
+  column: TruckBoardColumn;
+  columnKey: string;
+  color: BoardColor;
+  boardDisplaySettings: BoardDisplaySettings;
+  onToggleRouteComplete: (shipment: Shipment, truck: Truck) => void;
+  onSaveBoardNote: (shipment: Shipment, boardNote: string) => void;
+  onCreateTypedRouteStop: (truck: Truck, text: string) => void;
+  updatingId: string | null;
+  draggedItem: DraggedBoardItem | null;
+  dragOverShipmentId: string | null;
+  dragOverColumnKey: string | null;
+  onDragStart: (
+    event: DragEvent<HTMLDivElement>,
+    shipment: Shipment,
+    columnKey: string
+  ) => void;
+  onDragEnd: () => void;
+  onDragOverColumn: (columnKey: string) => void;
+  onDragOverShipment: (shipmentId: string, columnKey: string) => void;
+  onDropOnShipment: (
+    event: DragEvent<HTMLDivElement>,
+    shipment: Shipment,
+    columnKey: string
+  ) => void;
+  onDropOnColumnEnd: (
+    event: DragEvent<HTMLDivElement>,
+    columnKey: string
+  ) => void;
+}
+
+function TruckBoardColumnCard({
+  column,
+  columnKey,
+  color,
+  boardDisplaySettings,
+  onToggleRouteComplete,
+  onSaveBoardNote,
+  onCreateTypedRouteStop,
+  updatingId,
+  draggedItem,
+  dragOverShipmentId,
+  dragOverColumnKey,
+  onDragStart,
+  onDragEnd,
+  onDragOverColumn,
+  onDragOverShipment,
+  onDropOnShipment,
+  onDropOnColumnEnd,
+}: TruckBoardColumnCardProps) {
+  const { truck, shipments, totalSkids, totalWeightLbs, remainingSkids, remainingWeightLbs } = column;
+
+  const overSkids = remainingSkids < 0;
+  const overWeight = remainingWeightLbs < 0;
+
+  return (
+    <section
+      className={`flex min-h-0 flex-col overflow-hidden border-r ${color.body} bg-black ${
+        dragOverColumnKey === columnKey && draggedItem?.sourceColumnKey !== columnKey
+          ? 'ring-2 ring-blue-400'
+          : ''
+      }`}
+    >
+      <div className={`${color.header} flex-shrink-0 px-2 py-1.5`}>
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <TruckIcon className="h-4 w-4 flex-shrink-0" />
+            <p className="truncate text-base font-black leading-none">
+              {truck.truck_number}
+            </p>
+          </div>
+
+          <Link
+            href="/trucks"
+            className="rounded bg-black/10 px-1.5 py-0.5 text-[9px] font-black hover:bg-black/20"
+          >
+            EDIT
+          </Link>
+        </div>
+
+        <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] font-bold">
+          <User className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{truck.driver_name || 'Unassigned'}</span>
+        </div>
+
+        <div className="mt-1 grid grid-cols-2 gap-1 text-[9px] font-black">
+          <div className={`rounded bg-black/10 px-1 py-0.5 ${overSkids ? 'text-red-900' : ''}`}>
+            {totalSkids}/{truck.capacity_skids} SK
+          </div>
+
+          <div className={`rounded bg-black/10 px-1 py-0.5 ${overWeight ? 'text-red-900' : ''}`}>
+            {totalWeightLbs.toLocaleString()}/{truck.max_weight_lbs.toLocaleString()} LB
+          </div>
+        </div>
+      </div>
+
+      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_38px] border-b border-white/50 bg-slate-950 text-[9px] font-black uppercase tracking-wide text-white">
+        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+          ↕
+        </div>
+
+        <div className="border-r border-white/40 px-1.5 py-1">
+          Route / Note
+        </div>
+
+        <div className="px-0.5 py-1 text-center">
+          FIN
+        </div>
+      </div>
+
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${
+          dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
+        }`}
+        onDragOver={(event) => {
+          event.preventDefault();
+          onDragOverColumn(columnKey);
+        }}
+        onDrop={(event) => onDropOnColumnEnd(event, columnKey)}
+      >
+        <TypedRouteStopInput
+          truck={truck}
+          disabled={updatingId === `typed-stop-${truck.id}` || updatingId === 'reordering'}
+          onCreate={onCreateTypedRouteStop}
+        />
+
+        {shipments.length === 0 ? (
+          <div className="px-2 py-2 text-[10px] font-semibold uppercase text-slate-600">
+            Type above or drop freight here
+          </div>
+        ) : (
+          shipments.map((shipment) => (
+            <BoardShipmentRow
+              key={shipment.id}
+              shipment={shipment}
+              columnKey={columnKey}
+              boardDisplaySettings={boardDisplaySettings}
+              actionTitle="Toggle stop completed"
+              onAction={() => onToggleRouteComplete(shipment, truck)}
+              onSaveBoardNote={(boardNote) => onSaveBoardNote(shipment, boardNote)}
+              disabled={updatingId === shipment.id || updatingId === 'reordering'}
+              accentClassName={color.accent}
+              isDragging={draggedItem?.shipmentId === shipment.id}
+              isDragOver={dragOverShipmentId === shipment.id}
+              onDragStart={(event) => onDragStart(event, shipment, columnKey)}
+              onDragEnd={onDragEnd}
+              onDragOver={(event) => {
+                event.preventDefault();
+                onDragOverShipment(shipment.id, columnKey);
+              }}
+              onDrop={(event) => onDropOnShipment(event, shipment, columnKey)}
+            />
+          ))
+        )}
+
+        <EmptyTruckRows count={Math.max(18 - shipments.length, 4)} />
+      </div>
+    </section>
+  );
+}
+
+function TypedRouteStopInput({
+  truck,
+  disabled,
+  onCreate,
+}: {
+  truck: Truck;
+  disabled: boolean;
+  onCreate: (truck: Truck, text: string) => void;
+}) {
+  const [text, setText] = useState('');
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    const cleanedText = text.trim();
+
+    if (!cleanedText) {
+      return;
+    }
+
+    onCreate(truck, cleanedText);
+    setText('');
+  };
+
+  return (
+    <div className="grid min-h-[36px] grid-cols-[18px_1fr_38px] border-b border-dashed border-white/30 bg-slate-950/70 text-[11px] font-bold text-white">
+      <div className="flex items-center justify-center border-r border-white/20 text-slate-500">
+        +
+      </div>
+
+      <div className="border-r border-white/20 px-1 py-1">
+        <input
+          type="text"
+          value={text}
+          disabled={disabled}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Click and type route note, then Enter..."
+          className="w-full rounded border border-slate-800 bg-black px-2 py-1 text-[10px] font-semibold normal-case text-white outline-none placeholder:text-slate-600 focus:border-blue-400 disabled:cursor-wait disabled:opacity-60"
+        />
+      </div>
+
+      <div className="flex items-center justify-center text-[8px] font-black text-slate-500">
+        ENTER
+      </div>
+    </div>
+  );
+}
+
+interface PickupBoardColumnProps {
+  shipments: Shipment[];
+  columnKey: string;
+  onToggleDocs: (shipment: Shipment) => void;
+  onToggleCanada: (shipment: Shipment) => void;
+  onAssign: (shipment: Shipment) => void;
+  onEdit: (shipment: Shipment) => void;
+  updatingId: string | null;
+  draggedItem: DraggedBoardItem | null;
+  dragOverShipmentId: string | null;
+  dragOverColumnKey: string | null;
+  onDragStart: (
+    event: DragEvent<HTMLDivElement>,
+    shipment: Shipment,
+    columnKey: string
+  ) => void;
+  onDragEnd: () => void;
+  onDragOverColumn: (columnKey: string) => void;
+  onDragOverShipment: (shipmentId: string, columnKey: string) => void;
+  onDropOnShipment: (
+    event: DragEvent<HTMLDivElement>,
+    shipment: Shipment,
+    columnKey: string
+  ) => void;
+  onDropOnColumnEnd: (
+    event: DragEvent<HTMLDivElement>,
+    columnKey: string
+  ) => void;
+}
+
+function PickupBoardColumn({
+  shipments,
+  columnKey,
+  onToggleDocs,
+  onToggleCanada,
+  onAssign,
+  onEdit,
+  updatingId,
+  draggedItem,
+  dragOverShipmentId,
+  dragOverColumnKey,
+  onDragStart,
+  onDragEnd,
+  onDragOverColumn,
+  onDragOverShipment,
+  onDropOnShipment,
+  onDropOnColumnEnd,
+}: PickupBoardColumnProps) {
+  const totalSkids = shipments.reduce(
+    (sum, shipment) => sum + Number(shipment.number_of_skids || 0),
+    0
+  );
+
+  const missingDocs = shipments.filter(
+    (shipment) => !shipment.customs_docs_received
+  ).length;
+
+  return (
+    <section
+      className={`flex min-h-0 flex-col overflow-hidden border-r ${PICKUP_COLUMN_COLOR.body} bg-black ${
+        dragOverColumnKey === columnKey && draggedItem?.sourceColumnKey !== columnKey
+          ? 'ring-2 ring-blue-400'
+          : ''
+      }`}
+    >
+      <div className={`${PICKUP_COLUMN_COLOR.header} flex-shrink-0 px-2 py-1.5`}>
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <ClipboardList className="h-4 w-4 flex-shrink-0" />
+            <p className="truncate text-base font-black leading-none">
+              PICK UPS
+            </p>
+          </div>
+
+          <Link
+            href="/shipments"
+            className="rounded bg-black/10 px-1.5 py-0.5 text-[9px] font-black hover:bg-black/20"
+          >
+            ADD
+          </Link>
+        </div>
+
+        <div className="mt-1 grid grid-cols-3 gap-1 text-[9px] font-black">
+          <div className="rounded bg-black/10 px-1 py-0.5">
+            {shipments.length} PU
+          </div>
+
+          <div className="rounded bg-black/10 px-1 py-0.5">
+            {totalSkids} SK
+          </div>
+
+          <div className={`rounded px-1 py-0.5 ${missingDocs > 0 ? 'bg-red-700 text-white' : 'bg-black/10'}`}>
+            {missingDocs} NO DOC
+          </div>
+        </div>
+      </div>
+
+      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/50 bg-slate-950 text-[8px] font-black uppercase tracking-wide text-white">
+        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+          ↕
+        </div>
+
+        <div className="border-r border-white/40 px-1 py-1">
+          Pickup
+        </div>
+
+        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+          SK
+        </div>
+
+        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+          CAN
+        </div>
+
+        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+          DOC
+        </div>
+
+        <div className="px-0.5 py-1 text-center">
+          GO
+        </div>
+      </div>
+
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${
+          dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
+        }`}
+        onDragOver={(event) => {
+          event.preventDefault();
+          onDragOverColumn(columnKey);
+        }}
+        onDrop={(event) => onDropOnColumnEnd(event, columnKey)}
+      >
+        {shipments.length === 0 ? (
+          <div className="px-2 py-2 text-[10px] font-semibold uppercase text-slate-600">
+            Drop freight here
+          </div>
+        ) : (
+          shipments.map((shipment) => (
+            <CompactPickupRow
+              key={shipment.id}
+              shipment={shipment}
+              columnKey={columnKey}
+              onAssign={() => onAssign(shipment)}
+              onEdit={() => onEdit(shipment)}
+              onToggleDocs={() => onToggleDocs(shipment)}
+              onToggleCanada={() => onToggleCanada(shipment)}
+              disabled={updatingId === shipment.id || updatingId === 'reordering'}
+              isDragging={draggedItem?.shipmentId === shipment.id}
+              isDragOver={dragOverShipmentId === shipment.id}
+              onDragStart={(event) => onDragStart(event, shipment, columnKey)}
+              onDragEnd={onDragEnd}
+              onDragOver={(event) => {
+                event.preventDefault();
+                onDragOverShipment(shipment.id, columnKey);
+              }}
+              onDrop={(event) => onDropOnShipment(event, shipment, columnKey)}
+            />
+          ))
+        )}
+
+        <EmptyPickupRows count={Math.max(30 - shipments.length, 4)} />
+      </div>
+    </section>
+  );
+}
+
+interface CompactPickupRowProps {
+  shipment: Shipment;
+  columnKey: string;
+  onAssign: () => void;
+  onEdit: () => void;
+  onToggleDocs: () => void;
+  onToggleCanada: () => void;
+  disabled: boolean;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+}
+
+function CompactPickupRow({
+  shipment,
+  columnKey,
+  onAssign,
+  onEdit,
+  onToggleDocs,
+  onToggleCanada,
+  disabled,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: CompactPickupRowProps) {
+  const displayName = getPickupColumnDisplayName(shipment);
+  const city = shipment.pickup_city || shipment.delivery_city || '';
+  const skids = shipment.number_of_skids || 0;
+  const isHot =
+    String(shipment.priority_level || '').toLowerCase() === 'hot' ||
+    String(shipment.priority_level || '').toLowerCase() === 'urgent' ||
+    (shipment.notes || '').toLowerCase().includes('hot') ||
+    (shipment.notes || '').toLowerCase().includes('urgent') ||
+    (shipment.notes || '').toLowerCase().includes('rush');
+
+  const rowBackground = shipment.stays_in_canada
+    ? 'bg-red-950/80'
+    : isHot
+      ? 'bg-red-950/50'
+      : isDragOver
+        ? 'bg-blue-950/70'
+        : 'bg-black';
+
+  return (
+    <div
+      data-column-key={columnKey}
+      draggable={!disabled}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/30 text-white transition ${
+        rowBackground
+      } ${isDragging ? 'opacity-40' : ''} ${
+        isDragOver ? 'outline outline-2 outline-blue-400' : ''
+      }`}
+    >
+      <div
+        className="flex cursor-grab items-center justify-center border-r border-white/30 bg-slate-900 text-slate-500 active:cursor-grabbing"
+        title="Drag to assign or reorder"
+      >
+        <GripVertical className="h-3 w-3" />
+      </div>
+
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={disabled}
+        className="min-w-0 border-r border-white/30 px-1 py-0.5 text-left hover:bg-slate-900 disabled:cursor-wait disabled:opacity-60"
+        title="Click to edit pickup"
+      >
+        <div className="flex min-w-0 items-center gap-1">
+          {isHot && (
+            <span className="rounded bg-red-600 px-1 text-[7px] font-black text-white">
+              HOT
+            </span>
+          )}
+
+          <span className="truncate text-[10px] font-black uppercase leading-tight text-blue-200">
+            {displayName}
+          </span>
+        </div>
+
+        <p className="truncate text-[8px] font-semibold uppercase leading-tight text-slate-500">
+          {city || 'NO CITY'}
+          {shipment.board_note ? ` • ${shipment.board_note}` : ''}
+        </p>
+      </button>
+
+      <div className="flex items-center justify-center border-r border-white/30 text-[10px] font-black text-slate-200">
+        {skids || '-'}
+      </div>
+
+      <button
+        type="button"
+        onClick={onToggleCanada}
+        disabled={disabled}
+        className={`flex items-center justify-center border-r border-white/30 text-[7px] font-black disabled:cursor-wait disabled:opacity-60 ${
+          shipment.stays_in_canada
+            ? 'bg-red-700 text-white'
+            : 'bg-slate-950 text-slate-600 hover:bg-slate-800'
+        }`}
+        title="Toggle Canada"
+      >
+        CAN
+      </button>
+
+      <button
+        type="button"
+        onClick={onToggleDocs}
+        disabled={disabled}
+        className={`flex items-center justify-center border-r border-white/30 disabled:cursor-wait disabled:opacity-60 ${
+          shipment.customs_docs_received
+            ? 'bg-green-800 text-green-100'
+            : 'bg-red-900/70 text-red-100'
+        }`}
+        title="Toggle docs received"
+      >
+        {shipment.customs_docs_received ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <FileText className="h-3.5 w-3.5" />
+        )}
+      </button>
+
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={disabled}
+          className="flex flex-1 items-center justify-center border-r border-white/20 text-blue-200 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          title="Edit pickup"
+        >
+          <Edit2 className="h-3 w-3" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onAssign}
+          disabled={disabled}
+          className="flex flex-1 items-center justify-center text-[8px] font-black text-blue-200 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          title="Assign pickup"
+        >
+          GO
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface BoardShipmentRowProps {
+  shipment: Shipment;
+  columnKey: string;
+  boardDisplaySettings: BoardDisplaySettings;
+  actionTitle: string;
+  onAction: () => void;
+  onSaveBoardNote: (boardNote: string) => void;
+  disabled: boolean;
+  accentClassName: string;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+}
+
+function BoardShipmentRow({
+  shipment,
+  columnKey,
+  boardDisplaySettings,
+  actionTitle,
+  onAction,
+  onSaveBoardNote,
+  disabled,
+  accentClassName,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: BoardShipmentRowProps) {
+  const [draftNote, setDraftNote] = useState(shipment.board_note || '');
+
+  useEffect(() => {
+    setDraftNote(shipment.board_note || '');
+  }, [shipment.board_note]);
+
+  const isBoardOnlyStop = shipment.dispatch_task_type === 'board_stop';
+  const displayName = getBoardDisplayName(shipment, 'truck');
+
+  const city = shipment.delivery_city || shipment.pickup_city;
+
+  const metaParts =
+    isBoardOnlyStop
+      ? []
+      : [
+          boardDisplaySettings.showStopType ? getStopTypeLabel(shipment.board_stop_type) : null,
+          boardDisplaySettings.showCity ? city : null,
+          boardDisplaySettings.showSkids && shipment.number_of_skids
+            ? `${shipment.number_of_skids} SK`
+            : null,
+        ].filter(Boolean);
+
+  const referenceParts = isBoardOnlyStop
+    ? []
+    : [
+        boardDisplaySettings.showWorkOrderNumber && shipment.work_order_number
+          ? shipment.work_order_number
+          : null,
+        boardDisplaySettings.showCustomerReference && shipment.customer_reference
+          ? `Cust: ${shipment.customer_reference}`
+          : null,
+        boardDisplaySettings.showPickupReference && shipment.pickup_reference
+          ? `PU: ${shipment.pickup_reference}`
+          : null,
+        boardDisplaySettings.showDeliveryReference && shipment.delivery_reference
+          ? `DEL: ${shipment.delivery_reference}`
+          : null,
+      ].filter(Boolean);
+
+  const isHot =
+    !isBoardOnlyStop &&
+    (String(shipment.priority_level || '').toLowerCase() === 'hot' ||
+      String(shipment.priority_level || '').toLowerCase() === 'urgent' ||
+      (shipment.notes || '').toLowerCase().includes('hot') ||
+      (shipment.notes || '').toLowerCase().includes('urgent') ||
+      (shipment.notes || '').toLowerCase().includes('rush'));
+
+  const rowBackground = shipment.route_completed
+    ? 'bg-green-950/80'
+    : shipment.stays_in_canada
+      ? 'bg-red-950/80'
+      : isBoardOnlyStop
+        ? 'bg-slate-950'
+        : isDragOver
+          ? 'bg-blue-950/70'
+          : 'bg-black';
+
+  const nameColour = shipment.route_completed
+    ? 'text-green-200 line-through decoration-green-300/80'
+    : shipment.stays_in_canada
+      ? 'text-red-100'
+      : isBoardOnlyStop
+        ? 'text-white'
+        : isHot
+          ? 'text-red-200'
+          : accentClassName;
+
+  return (
+    <div
+      data-column-key={columnKey}
+      draggable={!disabled}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`grid min-h-[54px] grid-cols-[18px_1fr_38px] border-b border-white/40 text-[11px] font-bold uppercase text-white transition ${
+        rowBackground
+      } ${isDragging ? 'opacity-40' : ''} ${
+        isDragOver ? 'outline outline-2 outline-blue-400' : ''
+      }`}
+    >
+      <div
+        className="flex cursor-grab items-center justify-center border-r border-white/40 bg-slate-900 text-slate-400 active:cursor-grabbing"
+        title="Drag to move or reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+
+      <div className="min-w-0 border-r border-white/40 px-1.5 py-1">
+        <div className="flex flex-wrap items-center gap-1 leading-tight">
+          {shipment.route_completed && (
+            <span className="rounded bg-green-600 px-1 text-[8px] font-black text-white">
+              FIN
+            </span>
+          )}
+
+          {!isBoardOnlyStop && shipment.stays_in_canada && (
+            <span className="rounded bg-red-600 px-1 text-[8px] font-black text-white">
+              CAN
+            </span>
+          )}
+
+          {isBoardOnlyStop && (
+            <span className="rounded bg-slate-700 px-1 text-[8px] font-black text-white">
+              ROUTE
+            </span>
+          )}
+
+          {isHot && (
+            <span className="rounded bg-red-600 px-1 text-[8px] font-black text-white">
+              HOT
+            </span>
+          )}
+
+          <span className={`break-words text-[11px] font-black leading-tight ${nameColour}`}>
+            {displayName}
+          </span>
+        </div>
+
+        {referenceParts.length > 0 && (
+          <p className="mt-0.5 break-words text-[9px] font-black leading-tight text-blue-300">
+            {referenceParts.join(' • ')}
+          </p>
+        )}
+
+        {metaParts.length > 0 && (
+          <p className="mt-0.5 break-words text-[9px] font-semibold leading-tight text-slate-300">
+            {metaParts.join(' • ')}
+          </p>
+        )}
+
+        {boardDisplaySettings.showFinDetails && shipment.route_completed && (
+          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-green-300">
+            Done by {shipment.route_completed_by || 'driver'}
+          </p>
+        )}
+
+        {boardDisplaySettings.showBoardNote && (
+          <input
+            type="text"
+            value={draftNote}
+            onChange={(event) => setDraftNote(event.target.value)}
+            onBlur={() => onSaveBoardNote(draftNote)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.currentTarget.blur();
+              }
+            }}
+            placeholder={isBoardOnlyStop ? 'Extra note...' : 'Note...'}
+            className="mt-1 w-full rounded border border-yellow-800/70 bg-yellow-950/60 px-1 py-0.5 text-[10px] font-semibold normal-case text-yellow-200 outline-none placeholder:text-yellow-700 focus:border-yellow-300"
+            disabled={disabled}
+            draggable={false}
+            onDragStart={(event) => event.preventDefault()}
+          />
+        )}
+
+        {!isBoardOnlyStop && boardDisplaySettings.showNormalNotes && shipment.notes && (
+          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-slate-400">
+            {shipment.notes}
+          </p>
+        )}
+
+        {!isBoardOnlyStop && boardDisplaySettings.showInternalNotes && shipment.internal_notes && (
+          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-purple-300">
+            {shipment.internal_notes}
+          </p>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onAction}
+        disabled={disabled}
+        title={actionTitle}
+        className={`flex items-center justify-center hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 ${
+          shipment.route_completed ? 'bg-green-800/80' : ''
+        }`}
+      >
+        {disabled ? (
+          <span className="h-3 w-3 animate-pulse rounded-sm border border-white" />
+        ) : (
+          <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-white">
+            <Check className="h-3 w-3" />
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function EmptyTruckRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className="grid min-h-[36px] grid-cols-[18px_1fr_38px] border-b border-white/20"
+        >
+          <div className="border-r border-white/20" />
+          <div className="border-r border-white/20" />
+          <div />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function EmptyPickupRows({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className="grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/15"
+        >
+          <div className="border-r border-white/15" />
+          <div className="border-r border-white/15" />
+          <div className="border-r border-white/15" />
+          <div className="border-r border-white/15" />
+          <div className="border-r border-white/15" />
+          <div />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function SmallCompanyPreview({ company }: { company: Company }) {
+  return (
+    <div className="mt-3 rounded-lg border border-dark-border bg-slate-800 p-3 text-xs text-slate-400">
+      <p className="font-semibold text-slate-200">{company.name}</p>
+      <p className="mt-1">
+        {company.address || 'No address saved'}
+        {company.city ? `, ${company.city}` : ''}
+        {company.postal_code ? ` ${company.postal_code}` : ''}
+      </p>
+    </div>
+  );
+}
+
+function sortShipmentsForBoard(a: Shipment, b: Shipment) {
+  const aOrder =
+    a.board_sort_order === null || a.board_sort_order === undefined
+      ? 999
+      : Number(a.board_sort_order);
+
+  const bOrder =
+    b.board_sort_order === null || b.board_sort_order === undefined
+      ? 999
+      : Number(b.board_sort_order);
+
+  if (aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
+
+function getPickupColumnDisplayName(shipment: Shipment) {
+  if (shipment.board_name && shipment.board_name.trim() !== '') {
+    return shipment.board_name;
+  }
+
+  return (
+    shipment.pickup_company_name ||
+    shipment.delivery_company_name ||
+    shipment.customer_company_name ||
+    shipment.work_order_number ||
+    'Unknown pickup'
+  );
+}
+
+function getBoardDisplayName(shipment: Shipment, mode: 'truck' | 'pickup') {
+  if (shipment.board_name && shipment.board_name.trim() !== '') {
+    return shipment.board_name;
+  }
+
+  const stopType = shipment.board_stop_type || 'delivery';
+
+  if (mode === 'pickup') {
+    return (
+      shipment.pickup_company_name ||
+      shipment.delivery_company_name ||
+      'Unknown'
+    );
+  }
+
+  if (
+    stopType === 'pickup' ||
+    stopType === 'pickup_and_delivery' ||
+    stopType === 'warehouse'
+  ) {
+    return (
+      shipment.pickup_company_name ||
+      shipment.delivery_company_name ||
+      'Unknown'
+    );
+  }
+
+  if (stopType === 'cross_dock') {
+    return (
+      shipment.board_name ||
+      shipment.pickup_company_name ||
+      shipment.delivery_company_name ||
+      'Cross Dock'
+    );
+  }
+
+  return (
+    shipment.delivery_company_name ||
+    shipment.pickup_company_name ||
+    'Unknown'
+  );
+}
+
+function getStopTypeLabel(stopType?: string | null) {
+  if (stopType === 'pickup') return 'PU';
+  if (stopType === 'pickup_and_delivery') return 'PU/DEL';
+  if (stopType === 'cross_dock') return 'XDOCK';
+  if (stopType === 'warehouse') return 'WH';
+  return 'DEL';
+}
+
+function displayValue(value?: string | number | null, fallback = 'Unknown') {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+
+  return value;
+}
+
+function displayLocation(address?: string | null, city?: string | null) {
+  const parts = [address, city].filter(
+    (part) => part && String(part).trim() !== ''
+  );
+
+  if (parts.length === 0) {
+    return 'Location unknown';
+  }
+
+  return parts.join(', ');
+}
