@@ -5,6 +5,31 @@
 @layer base {
   * {
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 #020617;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: #020617;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+    border: 2px solid #020617;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: #020617;
   }
 
   html {
@@ -119,58 +144,32 @@
   .page-actions-left {
     @apply flex w-full flex-col gap-3 sm:flex-row sm:items-center;
   }
+
   .custom-board-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #334155 #020617;
-}
+    scrollbar-width: thin;
+    scrollbar-color: #334155 #020617;
+  }
 
-.custom-board-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
+  .custom-board-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-.custom-board-scrollbar::-webkit-scrollbar-track {
-  background: #020617;
-  border-left: 1px solid rgba(148, 163, 184, 0.12);
-}
+  .custom-board-scrollbar::-webkit-scrollbar-track {
+    background: #020617;
+  }
 
-.custom-board-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 999px;
-  border: 2px solid #020617;
-}
+  .custom-board-scrollbar::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+    border: 2px solid #020617;
+  }
 
-.custom-board-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
+  .custom-board-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
 
-.custom-board-scrollbar::-webkit-scrollbar-corner {
-  background: #020617;
-}
-.custom-board-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #334155 #020617;
-}
-
-.custom-board-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.custom-board-scrollbar::-webkit-scrollbar-track {
-  background: #020617;
-  border-left: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.custom-board-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 999px;
-  border: 2px solid #020617;
-}
-
-.custom-board-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-.custom-board-scrollbar::-webkit-scrollbar-corner {
-  background: #020617;
-}
+  .custom-board-scrollbar::-webkit-scrollbar-corner {
+    background: #020617;
+  }
 }

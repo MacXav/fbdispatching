@@ -541,7 +541,7 @@ function CurrentLayout({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
+    <div className="w-full">
       <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
@@ -552,7 +552,7 @@ function CurrentLayout({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           {activeTrucks.map((truck) => {
             const truckFreight = activeAssignedFreight.filter(
               (shipment) => shipment.assigned_truck_id === truck.id
@@ -631,27 +631,6 @@ function CurrentLayout({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
-        <h2 className="flex items-center gap-2 text-xl font-black text-white">
-          <AlertTriangle className="h-5 w-5 text-yellow-300" />
-          Rules
-        </h2>
-
-        <div className="mt-4 space-y-3">
-          <RuleCard
-            title="Freightboy Warehouse"
-            description="Try to keep all warehouse deliveries together on one truck."
-          />
-          <RuleCard
-            title="Buffalo"
-            description="Try to keep Buffalo area deliveries on their own truck."
-          />
-          <RuleCard
-            title="Other freight"
-            description="Fill remaining space without mixing into dedicated trucks when possible."
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -1801,106 +1780,136 @@ function optimizeStopAssignmentsByRouteBuckets(
 
   const truckMap = new Map(trucks.map((truck) => [truck.id, truck]));
 
-  const capacityUsed = new Map<string, { skids: number; weightLbs: number }>();
+  /*
+    Conservative cross-dock logic:
+    - Start by keeping every shipment exactly where dispatch already put it.
+    - Only suggest a move when there is a clear route-group problem.
+    - Do not move freight just because a rough distance score looks slightly better.
+    - Warehouse and Buffalo groups are treated as protected groups.
+  */
+  const nextStops: StopWithLocation[] = stops.map((stop) => ({
+    ...stop,
+    suggestedTruckId: stop.currentTruckId,
+    suggestedTruckNumber: stop.currentTruckNumber,
+  }));
 
-  for (const truck of trucks) {
-    capacityUsed.set(truck.id, {
-      skids: 0,
-      weightLbs: 0,
-    });
-  }
+  const capacityUsed = buildCapacityMapFromSuggestedStops(nextStops, trucks);
 
-  const nextStops: StopWithLocation[] = [];
+  const protectedBucketKeys = ['freightboy_warehouse', 'buffalo'];
 
-  const lockedStops = stops.filter((stop) => stop.locked);
-  const unlockedStops = stops.filter((stop) => !stop.locked);
+  for (const bucketKey of protectedBucketKeys) {
+    const bucketStops = nextStops.filter((stop) => stop.routeBucket === bucketKey);
 
-  for (const stop of lockedStops) {
-    const truck = truckMap.get(stop.currentTruckId);
-
-    if (!truck) {
+    if (bucketStops.length <= 1) {
       continue;
     }
 
-    const used = capacityUsed.get(stop.currentTruckId);
+    const dominantTruckId = findDominantTruckForStops(bucketStops);
 
-    if (used) {
-      used.skids += stop.skids;
-      used.weightLbs += stop.weightLbs;
+    if (!dominantTruckId) {
+      continue;
     }
 
-    nextStops.push({
-      ...stop,
-      suggestedTruckId: stop.currentTruckId,
-      suggestedTruckNumber: truck.truck_number,
-    });
-  }
-
-  const groups = Array.from(groupStopsByBucket(unlockedStops).values()).sort(
-    (a, b) => {
-      const priorityCompare = b.priority - a.priority;
-
-      if (priorityCompare !== 0) {
-        return priorityCompare;
+    /*
+      If most Warehouse freight is already on Unit 33, keep Unit 33 as the
+      warehouse truck and only pull split Warehouse freight back to it.
+      If most Buffalo freight is already on Unit 44, keep Unit 44 as the
+      Buffalo truck and only pull split Buffalo freight back to it.
+    */
+    for (const stop of bucketStops) {
+      if (stop.locked) {
+        continue;
       }
 
-      return b.skids - a.skids;
+      if (stop.suggestedTruckId === dominantTruckId) {
+        continue;
+      }
+
+      const moved = moveStopIfSafe({
+        stop,
+        targetTruckId: dominantTruckId,
+        nextStops,
+        trucks,
+        truckMap,
+        capacityUsed,
+        reason: 'protected-bucket-split',
+      });
+
+      if (!moved) {
+        continue;
+      }
     }
-  );
+  }
 
-  const reservedSpecialTruckIds = new Set<string>();
+  /*
+    Second pass:
+    If one truck has both Warehouse and Buffalo, fix only the minority/conflicting
+    protected freight by moving it back to that bucket's dominant truck.
+    This prevents a Buffalo truck from receiving random Warehouse freight.
+  */
+  for (const truck of trucks) {
+    const truckStops = nextStops.filter((stop) => stop.suggestedTruckId === truck.id);
+    const warehouseStops = truckStops.filter(
+      (stop) => stop.routeBucket === 'freightboy_warehouse'
+    );
+    const buffaloStops = truckStops.filter((stop) => stop.routeBucket === 'buffalo');
 
-  for (const group of groups) {
-    const bestTruck = findBestTruckForRouteBucket({
-      group,
-      trucks,
-      capacityUsed,
-      reservedSpecialTruckIds,
-    });
+    if (warehouseStops.length === 0 || buffaloStops.length === 0) {
+      continue;
+    }
 
-    if (!bestTruck) {
-      for (const stop of group.stops) {
-        const fallbackTruck = findBestTruckForSingleStop({
-          stop,
-          trucks,
-          capacityUsed,
-          reservedSpecialTruckIds,
-        });
+    const warehouseDominantTruckId = findDominantTruckForStops(
+      nextStops.filter((stop) => stop.routeBucket === 'freightboy_warehouse')
+    );
 
-        const used = capacityUsed.get(fallbackTruck.id);
+    const buffaloDominantTruckId = findDominantTruckForStops(
+      nextStops.filter((stop) => stop.routeBucket === 'buffalo')
+    );
 
-        if (used) {
-          used.skids += stop.skids;
-          used.weightLbs += stop.weightLbs;
+    const shouldMoveWarehouse =
+      warehouseStops.length <= buffaloStops.length &&
+      warehouseDominantTruckId &&
+      warehouseDominantTruckId !== truck.id;
+
+    const shouldMoveBuffalo =
+      buffaloStops.length < warehouseStops.length &&
+      buffaloDominantTruckId &&
+      buffaloDominantTruckId !== truck.id;
+
+    if (shouldMoveWarehouse && warehouseDominantTruckId) {
+      for (const stop of warehouseStops) {
+        if (stop.locked) {
+          continue;
         }
 
-        nextStops.push({
-          ...stop,
-          suggestedTruckId: fallbackTruck.id,
-          suggestedTruckNumber: fallbackTruck.truck_number,
+        moveStopIfSafe({
+          stop,
+          targetTruckId: warehouseDominantTruckId,
+          nextStops,
+          trucks,
+          truckMap,
+          capacityUsed,
+          reason: 'warehouse-on-buffalo-truck',
         });
       }
-
-      continue;
     }
 
-    if (group.isDedicatedBucket) {
-      reservedSpecialTruckIds.add(bestTruck.id);
-    }
+    if (shouldMoveBuffalo && buffaloDominantTruckId) {
+      for (const stop of buffaloStops) {
+        if (stop.locked) {
+          continue;
+        }
 
-    const used = capacityUsed.get(bestTruck.id);
-
-    if (used) {
-      used.skids += group.skids;
-      used.weightLbs += group.weightLbs;
-    }
-
-    for (const stop of group.stops) {
-      nextStops.push({
-        ...stop,
-        suggestedTruckId: bestTruck.id,
-        suggestedTruckNumber: bestTruck.truck_number,
-      });
+        moveStopIfSafe({
+          stop,
+          targetTruckId: buffaloDominantTruckId,
+          nextStops,
+          trucks,
+          truckMap,
+          capacityUsed,
+          reason: 'buffalo-on-warehouse-truck',
+        });
+      }
     }
   }
 
@@ -1923,6 +1932,166 @@ function optimizeStopAssignmentsByRouteBuckets(
       getPickupDisplayName(b.shipment)
     );
   });
+}
+
+function buildCapacityMapFromSuggestedStops(
+  stops: StopWithLocation[],
+  trucks: Truck[]
+) {
+  const capacityUsed = new Map<string, { skids: number; weightLbs: number }>();
+
+  for (const truck of trucks) {
+    capacityUsed.set(truck.id, {
+      skids: 0,
+      weightLbs: 0,
+    });
+  }
+
+  for (const stop of stops) {
+    const used = capacityUsed.get(stop.suggestedTruckId);
+
+    if (!used) {
+      continue;
+    }
+
+    used.skids += stop.skids;
+    used.weightLbs += stop.weightLbs;
+  }
+
+  return capacityUsed;
+}
+
+function findDominantTruckForStops(stops: StopWithLocation[]) {
+  const counts = new Map<
+    string,
+    {
+      truckId: string;
+      truckNumber: string;
+      stops: number;
+      skids: number;
+      weightLbs: number;
+    }
+  >();
+
+  for (const stop of stops) {
+    if (!counts.has(stop.suggestedTruckId)) {
+      counts.set(stop.suggestedTruckId, {
+        truckId: stop.suggestedTruckId,
+        truckNumber: stop.suggestedTruckNumber,
+        stops: 0,
+        skids: 0,
+        weightLbs: 0,
+      });
+    }
+
+    const group = counts.get(stop.suggestedTruckId);
+
+    if (!group) {
+      continue;
+    }
+
+    group.stops++;
+    group.skids += stop.skids;
+    group.weightLbs += stop.weightLbs;
+  }
+
+  const dominant = Array.from(counts.values()).sort((a, b) => {
+    if (b.stops !== a.stops) {
+      return b.stops - a.stops;
+    }
+
+    if (b.skids !== a.skids) {
+      return b.skids - a.skids;
+    }
+
+    return safeString(a.truckNumber).localeCompare(safeString(b.truckNumber));
+  })[0];
+
+  return dominant?.truckId || null;
+}
+
+function moveStopIfSafe({
+  stop,
+  targetTruckId,
+  nextStops,
+  trucks,
+  truckMap,
+  capacityUsed,
+}: {
+  stop: StopWithLocation;
+  targetTruckId: string;
+  nextStops: StopWithLocation[];
+  trucks: Truck[];
+  truckMap: Map<string, Truck>;
+  capacityUsed: Map<string, { skids: number; weightLbs: number }>;
+  reason: string;
+}) {
+  if (stop.suggestedTruckId === targetTruckId) {
+    return false;
+  }
+
+  const targetTruck = truckMap.get(targetTruckId);
+
+  if (!targetTruck) {
+    return false;
+  }
+
+  const sourceUsed = capacityUsed.get(stop.suggestedTruckId);
+  const targetUsed = capacityUsed.get(targetTruckId);
+
+  if (!targetUsed) {
+    return false;
+  }
+
+  const targetCapacitySkids = targetTruck.capacity_skids || 12;
+  const targetCapacityWeight = targetTruck.max_weight_lbs || 15000;
+
+  if (targetUsed.skids + stop.skids > targetCapacitySkids) {
+    return false;
+  }
+
+  if (targetUsed.weightLbs + stop.weightLbs > targetCapacityWeight) {
+    return false;
+  }
+
+  const targetStops = nextStops.filter(
+    (item) => item.suggestedTruckId === targetTruckId && item.shipment.id !== stop.shipment.id
+  );
+
+  const targetProtectedBuckets = new Set(
+    targetStops
+      .map((item) => item.routeBucket)
+      .filter((bucket) => bucket === 'freightboy_warehouse' || bucket === 'buffalo')
+  );
+
+  const movingProtectedBucket =
+    stop.routeBucket === 'freightboy_warehouse' || stop.routeBucket === 'buffalo';
+
+  /*
+    Do not create a Warehouse + Buffalo mixed truck.
+    The only time a protected bucket should move is back to the truck that
+    already owns that same protected bucket.
+  */
+  if (movingProtectedBucket) {
+    for (const bucket of targetProtectedBuckets) {
+      if (bucket !== stop.routeBucket) {
+        return false;
+      }
+    }
+  }
+
+  if (sourceUsed) {
+    sourceUsed.skids -= stop.skids;
+    sourceUsed.weightLbs -= stop.weightLbs;
+  }
+
+  targetUsed.skids += stop.skids;
+  targetUsed.weightLbs += stop.weightLbs;
+
+  stop.suggestedTruckId = targetTruck.id;
+  stop.suggestedTruckNumber = targetTruck.truck_number;
+
+  return true;
 }
 
 function groupStopsByBucket(stops: StopWithLocation[]) {

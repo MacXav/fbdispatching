@@ -684,8 +684,18 @@ export default function PickupsPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-5 shadow-2xl sm:p-8">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              resetForm();
+            }
+          }}
+        >
+          <div
+            className="custom-board-scrollbar max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-5 shadow-2xl sm:p-8"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-white">
@@ -979,7 +989,7 @@ export default function PickupsPage() {
           <p className="text-slate-400">No pickups found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-dark-border">
+        <div className="custom-board-scrollbar overflow-x-auto rounded-xl border border-dark-border">
           <table className="status-table">
             <thead>
               <tr>
