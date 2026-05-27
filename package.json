@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@headlessui/react": "^2.2.10",
     "@supabase/supabase-js": "^2.41.0",
     "git": "^0.1.5",
     "lucide-react": "^0.408.0",

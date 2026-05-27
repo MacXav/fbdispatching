@@ -139,6 +139,9 @@ export default function Dashboard() {
   const [draggedItem, setDraggedItem] = useState<DraggedBoardItem | null>(null);
   const [dragOverShipmentId, setDragOverShipmentId] = useState<string | null>(null);
   const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null);
+  const [dragDropPosition, setDragDropPosition] = useState<
+    'before' | 'after' | 'end' | null
+  >(null);
 
   const [boardDisplaySettings, setBoardDisplaySettings] = useState<BoardDisplaySettings>(
     loadBoardDisplaySettings()
@@ -843,12 +846,14 @@ export default function Dashboard() {
     setDraggedItem(null);
     setDragOverShipmentId(null);
     setDragOverColumnKey(null);
+    setDragDropPosition(null);
   };
 
   const handleDropOnShipment = async (
     event: DragEvent<HTMLDivElement>,
     targetShipment: Shipment,
-    targetColumnKey: string
+    targetColumnKey: string,
+    position: 'before' | 'after'
   ) => {
     event.preventDefault();
     event.stopPropagation();
@@ -860,11 +865,21 @@ export default function Dashboard() {
       return;
     }
 
+    const targetColumnShipments = getColumnShipments(targetColumnKey);
+    const targetIndex = targetColumnShipments.findIndex(
+      (shipment) => shipment.id === targetShipment.id
+    );
+
+    const targetBeforeShipmentId =
+      position === 'before'
+        ? targetShipment.id
+        : targetColumnShipments[targetIndex + 1]?.id || null;
+
     await saveBoardMove({
       shipmentId: draggedItem.shipmentId,
       sourceColumnKey: draggedItem.sourceColumnKey,
       targetColumnKey,
-      targetBeforeShipmentId: targetShipment.id,
+      targetBeforeShipmentId,
     });
   };
 
@@ -873,6 +888,7 @@ export default function Dashboard() {
     targetColumnKey: string
   ) => {
     event.preventDefault();
+    event.stopPropagation();
 
     if (!draggedItem) return;
 
@@ -1306,12 +1322,18 @@ export default function Dashboard() {
                   draggedItem={draggedItem}
                   dragOverShipmentId={dragOverShipmentId}
                   dragOverColumnKey={dragOverColumnKey}
+                  dragDropPosition={dragDropPosition}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
-                  onDragOverColumn={(columnKey) => setDragOverColumnKey(columnKey)}
-                  onDragOverShipment={(shipmentId, columnKey) => {
+                  onDragOverColumn={(columnKey) => {
+                    setDragOverShipmentId(null);
+                    setDragOverColumnKey(columnKey);
+                    setDragDropPosition('end');
+                  }}
+                  onDragOverShipment={(shipmentId, columnKey, position) => {
                     setDragOverShipmentId(shipmentId);
                     setDragOverColumnKey(columnKey);
+                    setDragDropPosition(position);
                   }}
                   onDropOnShipment={handleDropOnShipment}
                   onDropOnColumnEnd={handleDropOnColumnEnd}
@@ -1329,12 +1351,18 @@ export default function Dashboard() {
                 draggedItem={draggedItem}
                 dragOverShipmentId={dragOverShipmentId}
                 dragOverColumnKey={dragOverColumnKey}
+                dragDropPosition={dragDropPosition}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
-                onDragOverColumn={(columnKey) => setDragOverColumnKey(columnKey)}
-                onDragOverShipment={(shipmentId, columnKey) => {
+                onDragOverColumn={(columnKey) => {
+                  setDragOverShipmentId(null);
+                  setDragOverColumnKey(columnKey);
+                  setDragDropPosition('end');
+                }}
+                onDragOverShipment={(shipmentId, columnKey, position) => {
                   setDragOverShipmentId(shipmentId);
                   setDragOverColumnKey(columnKey);
+                  setDragDropPosition(position);
                 }}
                 onDropOnShipment={handleDropOnShipment}
                 onDropOnColumnEnd={handleDropOnColumnEnd}
@@ -1667,6 +1695,7 @@ interface TruckBoardColumnCardProps {
   draggedItem: DraggedBoardItem | null;
   dragOverShipmentId: string | null;
   dragOverColumnKey: string | null;
+  dragDropPosition: 'before' | 'after' | 'end' | null;
   onDragStart: (
     event: DragEvent<HTMLDivElement>,
     shipment: Shipment,
@@ -1674,11 +1703,16 @@ interface TruckBoardColumnCardProps {
   ) => void;
   onDragEnd: () => void;
   onDragOverColumn: (columnKey: string) => void;
-  onDragOverShipment: (shipmentId: string, columnKey: string) => void;
+  onDragOverShipment: (
+    shipmentId: string,
+    columnKey: string,
+    position: 'before' | 'after'
+  ) => void;
   onDropOnShipment: (
     event: DragEvent<HTMLDivElement>,
     shipment: Shipment,
-    columnKey: string
+    columnKey: string,
+    position: 'before' | 'after'
   ) => void;
   onDropOnColumnEnd: (
     event: DragEvent<HTMLDivElement>,
@@ -1698,6 +1732,7 @@ function TruckBoardColumnCard({
   draggedItem,
   dragOverShipmentId,
   dragOverColumnKey,
+  dragDropPosition,
   onDragStart,
   onDragEnd,
   onDragOverColumn,
@@ -1766,7 +1801,7 @@ function TruckBoardColumnCard({
       </div>
 
       <div
-        className={`min-h-0 flex-1 overflow-y-auto ${
+        className={`custom-board-scrollbar min-h-0 flex-1 overflow-y-auto ${
           dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
         }`}
         onDragOver={(event) => {
@@ -1799,13 +1834,29 @@ function TruckBoardColumnCard({
               accentClassName={color.accent}
               isDragging={draggedItem?.shipmentId === shipment.id}
               isDragOver={dragOverShipmentId === shipment.id}
+              isDragBefore={
+                dragOverShipmentId === shipment.id && dragDropPosition === 'before'
+              }
+              isDragAfter={
+                dragOverShipmentId === shipment.id && dragDropPosition === 'after'
+              }
               onDragStart={(event) => onDragStart(event, shipment, columnKey)}
               onDragEnd={onDragEnd}
               onDragOver={(event) => {
                 event.preventDefault();
-                onDragOverShipment(shipment.id, columnKey);
+                event.stopPropagation();
+
+                const position = getRowDropPosition(event.currentTarget, event.clientY);
+                onDragOverShipment(shipment.id, columnKey, position);
               }}
-              onDrop={(event) => onDropOnShipment(event, shipment, columnKey)}
+              onDrop={(event) =>
+                onDropOnShipment(
+                  event,
+                  shipment,
+                  columnKey,
+                  dragDropPosition === 'after' ? 'after' : 'before'
+                )
+              }
             />
           ))
         )}
@@ -1880,6 +1931,7 @@ interface PickupBoardColumnProps {
   draggedItem: DraggedBoardItem | null;
   dragOverShipmentId: string | null;
   dragOverColumnKey: string | null;
+  dragDropPosition: 'before' | 'after' | 'end' | null;
   onDragStart: (
     event: DragEvent<HTMLDivElement>,
     shipment: Shipment,
@@ -1887,11 +1939,16 @@ interface PickupBoardColumnProps {
   ) => void;
   onDragEnd: () => void;
   onDragOverColumn: (columnKey: string) => void;
-  onDragOverShipment: (shipmentId: string, columnKey: string) => void;
+  onDragOverShipment: (
+    shipmentId: string,
+    columnKey: string,
+    position: 'before' | 'after'
+  ) => void;
   onDropOnShipment: (
     event: DragEvent<HTMLDivElement>,
     shipment: Shipment,
-    columnKey: string
+    columnKey: string,
+    position: 'before' | 'after'
   ) => void;
   onDropOnColumnEnd: (
     event: DragEvent<HTMLDivElement>,
@@ -1910,6 +1967,7 @@ function PickupBoardColumn({
   draggedItem,
   dragOverShipmentId,
   dragOverColumnKey,
+  dragDropPosition,
   onDragStart,
   onDragEnd,
   onDragOverColumn,
@@ -1993,7 +2051,7 @@ function PickupBoardColumn({
       </div>
 
       <div
-        className={`min-h-0 flex-1 overflow-y-auto ${
+        className={`custom-board-scrollbar min-h-0 flex-1 overflow-y-auto ${
           dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
         }`}
         onDragOver={(event) => {
@@ -2019,13 +2077,29 @@ function PickupBoardColumn({
               disabled={updatingId === shipment.id || updatingId === 'reordering'}
               isDragging={draggedItem?.shipmentId === shipment.id}
               isDragOver={dragOverShipmentId === shipment.id}
+              isDragBefore={
+                dragOverShipmentId === shipment.id && dragDropPosition === 'before'
+              }
+              isDragAfter={
+                dragOverShipmentId === shipment.id && dragDropPosition === 'after'
+              }
               onDragStart={(event) => onDragStart(event, shipment, columnKey)}
               onDragEnd={onDragEnd}
               onDragOver={(event) => {
                 event.preventDefault();
-                onDragOverShipment(shipment.id, columnKey);
+                event.stopPropagation();
+
+                const position = getRowDropPosition(event.currentTarget, event.clientY);
+                onDragOverShipment(shipment.id, columnKey, position);
               }}
-              onDrop={(event) => onDropOnShipment(event, shipment, columnKey)}
+              onDrop={(event) =>
+                onDropOnShipment(
+                  event,
+                  shipment,
+                  columnKey,
+                  dragDropPosition === 'after' ? 'after' : 'before'
+                )
+              }
             />
           ))
         )}
@@ -2046,6 +2120,8 @@ interface CompactPickupRowProps {
   disabled: boolean;
   isDragging: boolean;
   isDragOver: boolean;
+  isDragBefore: boolean;
+  isDragAfter: boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -2062,6 +2138,8 @@ function CompactPickupRow({
   disabled,
   isDragging,
   isDragOver,
+  isDragBefore,
+  isDragAfter,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -2096,7 +2174,11 @@ function CompactPickupRow({
       className={`grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/30 text-white transition ${
         rowBackground
       } ${isDragging ? 'opacity-40' : ''} ${
-        isDragOver ? 'outline outline-2 outline-blue-400' : ''
+        isDragBefore ? 'border-t-4 border-t-blue-400' : ''
+      } ${
+        isDragAfter ? 'border-b-4 border-b-blue-400' : ''
+      } ${
+        isDragOver ? 'outline outline-1 outline-blue-400' : ''
       }`}
     >
       <div
@@ -2203,6 +2285,8 @@ interface BoardShipmentRowProps {
   accentClassName: string;
   isDragging: boolean;
   isDragOver: boolean;
+  isDragBefore: boolean;
+  isDragAfter: boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -2220,6 +2304,8 @@ function BoardShipmentRow({
   accentClassName,
   isDragging,
   isDragOver,
+  isDragBefore,
+  isDragAfter,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -2303,69 +2389,86 @@ function BoardShipmentRow({
       className={`grid min-h-[54px] grid-cols-[18px_1fr_38px] border-b border-white/40 text-[11px] font-bold uppercase text-white transition ${
         rowBackground
       } ${isDragging ? 'opacity-40' : ''} ${
-        isDragOver ? 'outline outline-2 outline-blue-400' : ''
+        isDragBefore ? 'border-t-4 border-t-blue-400' : ''
+      } ${
+        isDragAfter ? 'border-b-4 border-b-blue-400' : ''
+      } ${
+        isDragOver ? 'outline outline-1 outline-blue-400' : ''
       }`}
     >
       <div
-        className="flex cursor-grab items-center justify-center border-r border-white/40 bg-slate-900 text-slate-400 active:cursor-grabbing"
-        title="Drag to move or reorder"
+        className="flex cursor-grab items-center justify-center border-r border-white/40 bg-slate-900 text-slate-500 active:cursor-grabbing"
+        title="Drag to move this stop"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </div>
 
       <div className="min-w-0 border-r border-white/40 px-1.5 py-1">
-        <div className="flex flex-wrap items-center gap-1 leading-tight">
-          {shipment.route_completed && (
-            <span className="rounded bg-green-600 px-1 text-[8px] font-black text-white">
-              FIN
-            </span>
-          )}
+        <div className="flex min-w-0 items-start justify-between gap-1">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1">
+              {isHot && (
+                <span className="rounded bg-red-600 px-1 text-[7px] font-black text-white">
+                  HOT
+                </span>
+              )}
 
-          {!isBoardOnlyStop && shipment.stays_in_canada && (
-            <span className="rounded bg-red-600 px-1 text-[8px] font-black text-white">
-              CAN
-            </span>
-          )}
+              {shipment.stays_in_canada && (
+                <span className="rounded bg-red-700 px-1 text-[7px] font-black text-white">
+                  CAN
+                </span>
+              )}
 
-          {isBoardOnlyStop && (
-            <span className="rounded bg-slate-700 px-1 text-[8px] font-black text-white">
-              ROUTE
-            </span>
-          )}
+              <p className={`truncate text-[11px] font-black leading-tight ${nameColour}`}>
+                {displayName}
+              </p>
+            </div>
 
-          {isHot && (
-            <span className="rounded bg-red-600 px-1 text-[8px] font-black text-white">
-              HOT
-            </span>
-          )}
+            {referenceParts.length > 0 && (
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-500">
+                {referenceParts.join(' • ')}
+              </p>
+            )}
 
-          <span className={`break-words text-[11px] font-black leading-tight ${nameColour}`}>
-            {displayName}
-          </span>
+            {metaParts.length > 0 && (
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-400">
+                {metaParts.join(' • ')}
+              </p>
+            )}
+
+            {boardDisplaySettings.showBoardNote && shipment.board_note && (
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-yellow-200">
+                {shipment.board_note}
+              </p>
+            )}
+
+            {boardDisplaySettings.showNormalNotes && shipment.notes && (
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-500">
+                Note: {shipment.notes}
+              </p>
+            )}
+
+            {boardDisplaySettings.showInternalNotes && shipment.internal_notes && (
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-purple-300">
+                Internal: {shipment.internal_notes}
+              </p>
+            )}
+
+            {boardDisplaySettings.showFinDetails &&
+              shipment.route_completed &&
+              shipment.route_completed_by && (
+                <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-green-300">
+                  FIN by {shipment.route_completed_by}
+                </p>
+              )}
+          </div>
         </div>
 
-        {referenceParts.length > 0 && (
-          <p className="mt-0.5 break-words text-[9px] font-black leading-tight text-blue-300">
-            {referenceParts.join(' • ')}
-          </p>
-        )}
-
-        {metaParts.length > 0 && (
-          <p className="mt-0.5 break-words text-[9px] font-semibold leading-tight text-slate-300">
-            {metaParts.join(' • ')}
-          </p>
-        )}
-
-        {boardDisplaySettings.showFinDetails && shipment.route_completed && (
-          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-green-300">
-            Done by {shipment.route_completed_by || 'driver'}
-          </p>
-        )}
-
-        {boardDisplaySettings.showBoardNote && (
+        {isBoardOnlyStop ? null : (
           <input
             type="text"
             value={draftNote}
+            disabled={disabled}
             onChange={(event) => setDraftNote(event.target.value)}
             onBlur={() => onSaveBoardNote(draftNote)}
             onKeyDown={(event) => {
@@ -2373,24 +2476,10 @@ function BoardShipmentRow({
                 event.currentTarget.blur();
               }
             }}
-            placeholder={isBoardOnlyStop ? 'Extra note...' : 'Note...'}
-            className="mt-1 w-full rounded border border-yellow-800/70 bg-yellow-950/60 px-1 py-0.5 text-[10px] font-semibold normal-case text-yellow-200 outline-none placeholder:text-yellow-700 focus:border-yellow-300"
-            disabled={disabled}
-            draggable={false}
-            onDragStart={(event) => event.preventDefault()}
+            onDragStart={(event) => event.stopPropagation()}
+            placeholder="Board note..."
+            className="mt-1 w-full rounded border border-slate-800 bg-black px-1 py-0.5 text-[9px] font-semibold normal-case text-white outline-none placeholder:text-slate-700 focus:border-blue-400 disabled:cursor-wait disabled:opacity-60"
           />
-        )}
-
-        {!isBoardOnlyStop && boardDisplaySettings.showNormalNotes && shipment.notes && (
-          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-slate-400">
-            {shipment.notes}
-          </p>
-        )}
-
-        {!isBoardOnlyStop && boardDisplaySettings.showInternalNotes && shipment.internal_notes && (
-          <p className="mt-0.5 break-words text-[9px] font-semibold normal-case leading-tight text-purple-300">
-            {shipment.internal_notes}
-          </p>
         )}
       </div>
 
@@ -2398,18 +2487,14 @@ function BoardShipmentRow({
         type="button"
         onClick={onAction}
         disabled={disabled}
-        title={actionTitle}
-        className={`flex items-center justify-center hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 ${
-          shipment.route_completed ? 'bg-green-800/80' : ''
+        className={`flex items-center justify-center text-[9px] font-black disabled:cursor-wait disabled:opacity-60 ${
+          shipment.route_completed
+            ? 'bg-green-700 text-white'
+            : 'bg-slate-950 text-slate-500 hover:bg-slate-800'
         }`}
+        title={actionTitle}
       >
-        {disabled ? (
-          <span className="h-3 w-3 animate-pulse rounded-sm border border-white" />
-        ) : (
-          <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-white">
-            <Check className="h-3 w-3" />
-          </span>
-        )}
+        FIN
       </button>
     </div>
   );
@@ -2421,10 +2506,12 @@ function EmptyTruckRows({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="grid min-h-[36px] grid-cols-[18px_1fr_38px] border-b border-white/20"
+          className="grid min-h-[28px] grid-cols-[18px_1fr_38px] border-b border-white/10 text-[9px] text-slate-800"
         >
-          <div className="border-r border-white/20" />
-          <div className="border-r border-white/20" />
+          <div className="border-r border-white/10" />
+          <div className="border-r border-white/10 px-1 py-1">
+            {index === 0 ? 'Drop at bottom' : ''}
+          </div>
           <div />
         </div>
       ))}
@@ -2438,13 +2525,15 @@ function EmptyPickupRows({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/15"
+          className="grid min-h-[28px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/10 text-[9px] text-slate-800"
         >
-          <div className="border-r border-white/15" />
-          <div className="border-r border-white/15" />
-          <div className="border-r border-white/15" />
-          <div className="border-r border-white/15" />
-          <div className="border-r border-white/15" />
+          <div className="border-r border-white/10" />
+          <div className="border-r border-white/10 px-1 py-1">
+            {index === 0 ? 'Drop at bottom' : ''}
+          </div>
+          <div className="border-r border-white/10" />
+          <div className="border-r border-white/10" />
+          <div className="border-r border-white/10" />
           <div />
         </div>
       ))}
@@ -2454,27 +2543,41 @@ function EmptyPickupRows({ count }: { count: number }) {
 
 function SmallCompanyPreview({ company }: { company: Company }) {
   return (
-    <div className="mt-3 rounded-lg border border-dark-border bg-slate-800 p-3 text-xs text-slate-400">
-      <p className="font-semibold text-slate-200">{company.name}</p>
-      <p className="mt-1">
-        {company.address || 'No address saved'}
-        {company.city ? `, ${company.city}` : ''}
-        {company.postal_code ? ` ${company.postal_code}` : ''}
+    <div className="mt-2 rounded-lg border border-dark-border bg-slate-950 p-3 text-xs text-slate-400">
+      <p className="font-semibold text-slate-200">
+        {company.name}
       </p>
+
+      <p className="mt-1">
+        {displayLocation(company.address, company.city)}
+      </p>
+
+      {company.postal_code && (
+        <p>{company.postal_code}</p>
+      )}
+
+      {(company.contact_name || company.contact_phone) && (
+        <p className="mt-1">
+          {[company.contact_name, company.contact_phone].filter(Boolean).join(' • ')}
+        </p>
+      )}
     </div>
   );
 }
 
-function sortShipmentsForBoard(a: Shipment, b: Shipment) {
-  const aOrder =
-    a.board_sort_order === null || a.board_sort_order === undefined
-      ? 999
-      : Number(a.board_sort_order);
+function getRowDropPosition(
+  element: HTMLDivElement,
+  clientY: number
+): 'before' | 'after' {
+  const rectangle = element.getBoundingClientRect();
+  const midpoint = rectangle.top + rectangle.height / 2;
 
-  const bOrder =
-    b.board_sort_order === null || b.board_sort_order === undefined
-      ? 999
-      : Number(b.board_sort_order);
+  return clientY < midpoint ? 'before' : 'after';
+}
+
+function sortShipmentsForBoard(a: Shipment, b: Shipment) {
+  const aOrder = a.board_sort_order ?? 999;
+  const bOrder = b.board_sort_order ?? 999;
 
   if (aOrder !== bOrder) {
     return aOrder - bOrder;
@@ -2484,65 +2587,52 @@ function sortShipmentsForBoard(a: Shipment, b: Shipment) {
 }
 
 function getPickupColumnDisplayName(shipment: Shipment) {
+  if (shipment.pickup_company_name && shipment.pickup_company_name.trim() !== '') {
+    return shipment.pickup_company_name;
+  }
+
   if (shipment.board_name && shipment.board_name.trim() !== '') {
     return shipment.board_name;
   }
 
   return (
-    shipment.pickup_company_name ||
-    shipment.delivery_company_name ||
     shipment.customer_company_name ||
     shipment.work_order_number ||
-    'Unknown pickup'
+    shipment.delivery_company_name ||
+    'Pickup'
   );
 }
 
-function getBoardDisplayName(shipment: Shipment, mode: 'truck' | 'pickup') {
+function getBoardDisplayName(shipment: Shipment, context: 'truck' | 'pickup') {
   if (shipment.board_name && shipment.board_name.trim() !== '') {
     return shipment.board_name;
   }
 
-  const stopType = shipment.board_stop_type || 'delivery';
+  if (context === 'truck') {
+    if (shipment.delivery_company_name && shipment.delivery_company_name.trim() !== '') {
+      return shipment.delivery_company_name;
+    }
 
-  if (mode === 'pickup') {
-    return (
-      shipment.pickup_company_name ||
-      shipment.delivery_company_name ||
-      'Unknown'
-    );
+    if (shipment.pickup_company_name && shipment.pickup_company_name.trim() !== '') {
+      return shipment.pickup_company_name;
+    }
   }
 
-  if (
-    stopType === 'pickup' ||
-    stopType === 'pickup_and_delivery' ||
-    stopType === 'warehouse'
-  ) {
-    return (
-      shipment.pickup_company_name ||
-      shipment.delivery_company_name ||
-      'Unknown'
-    );
-  }
-
-  if (stopType === 'cross_dock') {
-    return (
-      shipment.board_name ||
-      shipment.pickup_company_name ||
-      shipment.delivery_company_name ||
-      'Cross Dock'
-    );
+  if (shipment.pickup_company_name && shipment.pickup_company_name.trim() !== '') {
+    return shipment.pickup_company_name;
   }
 
   return (
+    shipment.customer_company_name ||
+    shipment.work_order_number ||
     shipment.delivery_company_name ||
-    shipment.pickup_company_name ||
-    'Unknown'
+    'Stop'
   );
 }
 
 function getStopTypeLabel(stopType?: string | null) {
   if (stopType === 'pickup') return 'PU';
-  if (stopType === 'pickup_and_delivery') return 'PU/DEL';
+  if (stopType === 'pickup_and_delivery') return 'PU+DEL';
   if (stopType === 'cross_dock') return 'XDOCK';
   if (stopType === 'warehouse') return 'WH';
   return 'DEL';

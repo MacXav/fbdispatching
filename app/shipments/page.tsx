@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import MainLayout from '@/components/MainLayout';
 import Header from '@/components/Header';
 import { ChevronDown, ChevronUp, Edit2, Plus, Trash2, X } from 'lucide-react';
@@ -762,56 +762,6 @@ export default function PickupsPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
-                  Board Display
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <TextField
-                    label="Board Name"
-                    placeholder="Example: TDG USA PU, Warehouse, TDG CAN"
-                    value={formData.board_name}
-                    onChange={(value) =>
-                      setFormData({ ...formData, board_name: value })
-                    }
-                    helpText="Leave blank to use the pickup or delivery company name."
-                  />
-
-                  <div>
-                    <label className="mb-3 block text-sm font-medium text-slate-300">
-                      Dispatch Task Type
-                    </label>
-
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                      {stopTypeOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              board_stop_type: option.value,
-                            })
-                          }
-                          className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-                            formData.board_stop_type === option.value
-                              ? 'border-blue-500 bg-blue-950 text-blue-100'
-                              : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
-                          }`}
-                        >
-                          <p className="font-semibold">{option.label}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {option.description}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
                 <h3 className="mb-4 text-lg font-semibold text-white">
                   Freight Details
@@ -1079,7 +1029,7 @@ export default function PickupsPage() {
                         {getBoardDisplayName(shipment)}
                       </p>
                       <p className="mt-1 text-xs capitalize text-slate-400">
-                        {(shipment.board_stop_type || 'pickup').replaceAll('_', ' ')}
+                        {(shipment.board_stop_type || 'pickup').replace(/_/, ' ')}
                       </p>
                     </td>
 
@@ -1463,9 +1413,14 @@ function CreatableCompanyField({
   creating: boolean;
   createLabel: string;
 }) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
   const selectedItem = items.find((item) => item.id === selectedId) || null;
+
   const [query, setQuery] = useState(selectedItem?.label || '');
-  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   useEffect(() => {
     setQuery(selectedItem?.label || '');
@@ -1473,31 +1428,209 @@ function CreatableCompanyField({
 
   const cleanedQuery = query.trim().toLowerCase();
 
-  const matchingItems = cleanedQuery
-    ? items
-        .filter((item) => {
-          const searchableText = [
-            item.label,
-            item.description,
-            item.keywords,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
+  const matchingItems = useMemo(() => {
+    if (!cleanedQuery) {
+      return items.slice(0, 40);
+    }
 
-          return searchableText.includes(cleanedQuery);
-        })
-        .slice(0, 8)
-    : items.slice(0, 8);
+    const queryParts = cleanedQuery.split(/\s+/).filter(Boolean);
+
+    return items
+      .map((item) => {
+        const labelText = item.label.toLowerCase();
+
+        const searchableText = [
+          item.label,
+          item.description,
+          item.keywords,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        const matches = queryParts.every((part) => searchableText.includes(part));
+
+        if (!matches) {
+          return null;
+        }
+
+        let score = 0;
+
+        if (labelText === cleanedQuery) score += 100;
+        if (labelText.startsWith(cleanedQuery)) score += 70;
+        if (labelText.includes(cleanedQuery)) score += 40;
+        if (item.description.toLowerCase().includes(cleanedQuery)) score += 10;
+        if (item.keywords.toLowerCase().includes(cleanedQuery)) score += 5;
+
+        return {
+          item,
+          score,
+        };
+      })
+      .filter((result): result is { item: CompanySearchItem; score: number } =>
+        Boolean(result)
+      )
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+
+        return a.item.label.localeCompare(b.item.label);
+      })
+      .slice(0, 40)
+      .map((result) => result.item);
+  }, [items, cleanedQuery]);
 
   const exactMatch = items.some(
     (item) => item.label.trim().toLowerCase() === cleanedQuery
   );
 
-  const showMenu = focused && (matchingItems.length > 0 || query.trim() !== '');
+  const canCreate = query.trim() !== '' && !exactMatch;
+  const totalOptions = matchingItems.length + (canCreate ? 1 : 0);
+  const showMenu = open && totalOptions > 0;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (!target || !wrapperRef.current) {
+        return;
+      }
+
+      if (!wrapperRef.current.contains(target)) {
+        setOpen(false);
+        setHighlightedIndex(0);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!showMenu) {
+      return;
+    }
+
+    const highlightedOption = listRef.current?.querySelector(
+      `[data-option-index="${highlightedIndex}"]`
+    );
+
+    highlightedOption?.scrollIntoView({
+      block: 'nearest',
+    });
+  }, [highlightedIndex, showMenu]);
+
+  useEffect(() => {
+    setHighlightedIndex((currentIndex) => {
+      if (totalOptions <= 0) {
+        return 0;
+      }
+
+      return Math.min(currentIndex, totalOptions - 1);
+    });
+  }, [totalOptions]);
+
+  const closeMenu = () => {
+    setOpen(false);
+    setHighlightedIndex(0);
+  };
+
+  const selectCompany = (item: CompanySearchItem) => {
+    onSelect(item);
+    setQuery(item.label);
+    closeMenu();
+  };
+
+  const createCompany = () => {
+    const cleanedName = query.trim();
+
+    if (!cleanedName || creating) {
+      return;
+    }
+
+    onCreate(cleanedName);
+    closeMenu();
+  };
+
+  const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      event.stopPropagation();
+
+      setOpen(true);
+
+      setHighlightedIndex((currentIndex) => {
+        if (totalOptions <= 0) {
+          return 0;
+        }
+
+        return currentIndex >= totalOptions - 1 ? 0 : currentIndex + 1;
+      });
+
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      event.stopPropagation();
+
+      setOpen(true);
+
+      setHighlightedIndex((currentIndex) => {
+        if (totalOptions <= 0) {
+          return 0;
+        }
+
+        return currentIndex <= 0 ? totalOptions - 1 : currentIndex - 1;
+      });
+
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      if (!open) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const highlightedCompany = matchingItems[highlightedIndex];
+
+      if (highlightedCompany) {
+        selectCompany(highlightedCompany);
+        return;
+      }
+
+      if (canCreate && highlightedIndex === matchingItems.length) {
+        createCompany();
+      }
+
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      closeMenu();
+    }
+  };
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <label className="mb-2 block text-sm font-medium text-slate-300">
         {label}
       </label>
@@ -1508,14 +1641,21 @@ function CreatableCompanyField({
           className="input-field"
           placeholder={placeholder}
           value={query}
-          onFocus={() => setFocused(true)}
+          autoComplete="off"
+          onFocus={() => {
+            setOpen(true);
+            setHighlightedIndex(0);
+          }}
           onChange={(event) => {
             setQuery(event.target.value);
+            setOpen(true);
+            setHighlightedIndex(0);
 
             if (selectedId) {
               onClear();
             }
           }}
+          onKeyDown={handleInputKeyDown}
         />
 
         {(selectedId || query.trim()) && (
@@ -1524,6 +1664,7 @@ function CreatableCompanyField({
             onClick={() => {
               setQuery('');
               onClear();
+              closeMenu();
             }}
             className="rounded-lg border border-dark-border bg-slate-800 px-3 text-sm font-semibold text-slate-200 hover:bg-slate-700"
           >
@@ -1533,36 +1674,53 @@ function CreatableCompanyField({
       </div>
 
       {showMenu && (
-        <div className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-dark-border bg-slate-950 shadow-2xl">
-          {matchingItems.map((item) => (
+        <div
+          ref={listRef}
+          className="custom-board-scrollbar absolute z-[9999] mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-dark-border bg-slate-950 shadow-2xl"
+        >
+          {matchingItems.map((item, index) => (
             <button
               key={item.id}
               type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onSelect(item);
-                setQuery(item.label);
-                setFocused(false);
+              data-option-index={index}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectCompany(item);
               }}
-              className="block w-full border-b border-dark-border px-4 py-3 text-left hover:bg-slate-800"
+              onMouseEnter={() => setHighlightedIndex(index)}
+              className={`block w-full border-b border-dark-border px-4 py-3 text-left ${
+                highlightedIndex === index
+                  ? 'bg-blue-950 text-blue-100'
+                  : 'text-slate-200 hover:bg-slate-800'
+              }`}
             >
               <p className="font-semibold text-white">{item.label}</p>
+
               {item.description && (
-                <p className="mt-1 text-xs text-slate-400">{item.description}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {item.description}
+                </p>
               )}
             </button>
           ))}
 
-          {!exactMatch && query.trim() !== '' && (
+          {canCreate && (
             <button
               type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onCreate(query.trim());
-                setFocused(false);
+              data-option-index={matchingItems.length}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                createCompany();
               }}
+              onMouseEnter={() => setHighlightedIndex(matchingItems.length)}
               disabled={creating}
-              className="block w-full px-4 py-3 text-left font-semibold text-green-300 hover:bg-green-950 disabled:opacity-60"
+              className={`block w-full px-4 py-3 text-left font-semibold disabled:opacity-60 ${
+                highlightedIndex === matchingItems.length
+                  ? 'bg-green-950 text-green-200'
+                  : 'text-green-300 hover:bg-green-950'
+              }`}
             >
               {creating ? 'Creating...' : `${createLabel}: ${query.trim()}`}
             </button>
