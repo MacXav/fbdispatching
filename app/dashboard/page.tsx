@@ -75,39 +75,39 @@ const emptyPickupEditForm: PickupEditForm = {
 
 const BOARD_COLORS = [
   {
-    header: 'bg-red-300 text-black',
+    header: 'bg-red-700 text-white',
     body: 'border-red-300/70',
     accent: 'text-red-200',
   },
   {
-    header: 'bg-green-500 text-black',
+    header: 'bg-green-700 text-white',
     body: 'border-green-500/70',
     accent: 'text-green-300',
   },
   {
-    header: 'bg-pink-200 text-black',
+    header: 'bg-pink-700 text-white',
     body: 'border-pink-200/70',
     accent: 'text-pink-200',
   },
   {
-    header: 'bg-orange-500 text-black',
+    header: 'bg-orange-700 text-white',
     body: 'border-orange-500/70',
     accent: 'text-orange-300',
   },
   {
-    header: 'bg-slate-300 text-black',
+    header: 'bg-slate-700 text-white',
     body: 'border-slate-300/70',
     accent: 'text-slate-300',
   },
   {
-    header: 'bg-rose-500 text-black',
+    header: 'bg-rose-700 text-white',
     body: 'border-rose-500/70',
     accent: 'text-rose-300',
   },
 ];
 
 const PICKUP_COLUMN_COLOR = {
-  header: 'bg-blue-300 text-black',
+  header: 'bg-blue-700 text-white',
   body: 'border-blue-300/70',
   accent: 'text-blue-300',
 };
@@ -1248,13 +1248,13 @@ export default function Dashboard() {
 
   return (
     <MainLayout>
-      <div className="flex h-full w-full flex-col overflow-hidden bg-black">
-        <div className="flex h-[48px] flex-shrink-0 items-center justify-between border-b border-dark-border bg-dark-bg px-2">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-white">
+        <div className="flex h-[48px] flex-shrink-0 items-center justify-between border-b-2 border-slate-400 bg-white px-2 shadow-sm dark:border-dark-border dark:bg-dark-bg">
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-black text-white">
+            <h1 className="truncate text-lg font-black text-slate-950 dark:text-white">
               Truck Board
             </h1>
-            <p className="truncate text-[11px] text-slate-400">
+            <p className="truncate text-[11px] text-slate-600 dark:text-slate-400">
               Drag freight, type route notes, and track what each driver is doing
             </p>
           </div>
@@ -1262,7 +1262,7 @@ export default function Dashboard() {
           <div className="flex flex-shrink-0 gap-1.5">
             <Link
               href="/settings"
-              className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-white hover:bg-slate-600"
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
             >
               Board Settings
             </Link>
@@ -1270,7 +1270,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={loadBoardData}
-              className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-white hover:bg-slate-600 disabled:opacity-60"
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
               disabled={loading}
             >
               <RefreshCw className={`mr-1 inline h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
@@ -1297,11 +1297,11 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <div className="flex flex-1 items-center justify-center bg-dark-bg">
-            <p className="text-slate-400">Loading truck board...</p>
+          <div className="flex flex-1 items-center justify-center bg-white dark:bg-dark-bg">
+            <p className="text-slate-600 dark:text-slate-400">Loading truck board...</p>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 bg-black p-0">
+          <div className="min-h-0 flex-1 bg-white p-0">
             <div
               className="grid h-full w-full gap-0"
               style={{
@@ -1372,15 +1372,15 @@ export default function Dashboard() {
         )}
 
         {assigningShipment && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-xl rounded-xl border border-dark-border bg-dark-card p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/70">
+            <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-dark-border dark:bg-dark-card">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
+                  <h2 className="text-2xl font-black text-slate-950 dark:text-white">
                     Assign Pickup to Truck
                   </h2>
 
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     {displayValue(assigningShipment.pickup_company_name)} •{' '}
                     {displayLocation(assigningShipment.pickup_address, assigningShipment.pickup_city)}
                   </p>
@@ -1389,7 +1389,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={closeAssignModal}
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -1428,15 +1428,15 @@ export default function Dashboard() {
         )}
 
         {editingPickup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/70">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-dark-border dark:bg-dark-card">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
+                  <h2 className="text-2xl font-black text-slate-950 dark:text-white">
                     Edit Pickup
                   </h2>
 
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Change the pickup without leaving the board.
                   </p>
                 </div>
@@ -1444,7 +1444,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={closePickupEditModal}
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -1506,7 +1506,7 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                     Board Name
                   </label>
 
@@ -1525,7 +1525,7 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="mb-3 block text-sm font-medium text-slate-300">
+                  <label className="mb-3 block text-sm font-medium text-slate-700 dark:text-slate-300">
                     Stop Type
                   </label>
 
@@ -1542,8 +1542,8 @@ export default function Dashboard() {
                         }
                         className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
                           pickupEditForm.board_stop_type === option.value
-                            ? 'border-blue-500 bg-blue-950 text-blue-100'
-                            : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
+                            ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-100'
+                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                         }`}
                       >
                         {option.label}
@@ -1554,7 +1554,7 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Skids
                     </label>
 
@@ -1574,7 +1574,7 @@ export default function Dashboard() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Weight LBS
                     </label>
 
@@ -1595,7 +1595,7 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                     Board Note
                   </label>
 
@@ -1624,8 +1624,8 @@ export default function Dashboard() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       pickupEditForm.customs_docs_received
-                        ? 'border-green-700 bg-green-950 text-green-200'
-                        : 'border-red-700 bg-red-950 text-red-200'
+                        ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-200'
+                        : 'border-red-300 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200'
                     }`}
                   >
                     DOC: {pickupEditForm.customs_docs_received ? 'Received' : 'Not Received'}
@@ -1641,8 +1641,8 @@ export default function Dashboard() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       pickupEditForm.stays_in_canada
-                        ? 'border-red-600 bg-red-900 text-white'
-                        : 'border-slate-700 bg-slate-900 text-slate-300'
+                        ? 'border-red-600 bg-red-600 text-white dark:bg-red-900'
+                        : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
                     }`}
                   >
                     CAN: {pickupEditForm.stays_in_canada ? 'Canada' : 'Not Canada'}
@@ -1747,7 +1747,7 @@ function TruckBoardColumnCard({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden border-r ${color.body} bg-black ${
+      className={`flex min-h-0 flex-col overflow-hidden border-r ${color.body} bg-white ${
         dragOverColumnKey === columnKey && draggedItem?.sourceColumnKey !== columnKey
           ? 'ring-2 ring-blue-400'
           : ''
@@ -1786,12 +1786,12 @@ function TruckBoardColumnCard({
         </div>
       </div>
 
-      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_38px] border-b border-white/50 bg-slate-950 text-[9px] font-black uppercase tracking-wide text-white">
-        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_38px] border-b-2 border-slate-400 bg-slate-100 text-[9px] font-black uppercase tracking-wide text-slate-700">
+        <div className="border-r-2 border-slate-400 px-0.5 py-1 text-center">
           ↕
         </div>
 
-        <div className="border-r border-white/40 px-1.5 py-1">
+        <div className="border-r-2 border-slate-400 px-1.5 py-1">
           Route / Note
         </div>
 
@@ -1802,7 +1802,7 @@ function TruckBoardColumnCard({
 
       <div
         className={`custom-board-scrollbar min-h-0 flex-1 overflow-y-auto ${
-          dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
+          dragOverColumnKey === columnKey ? 'bg-blue-50' : ''
         }`}
         onDragOver={(event) => {
           event.preventDefault();
@@ -1896,12 +1896,12 @@ function TypedRouteStopInput({
   };
 
   return (
-    <div className="grid min-h-[36px] grid-cols-[18px_1fr_38px] border-b border-dashed border-white/30 bg-slate-950/70 text-[11px] font-bold text-white">
-      <div className="flex items-center justify-center border-r border-white/20 text-slate-500">
+    <div className="grid min-h-[36px] grid-cols-[18px_1fr_38px] border-b border-dashed border-slate-300 bg-slate-50 text-[11px] font-bold text-slate-800">
+      <div className="flex items-center justify-center border-r-2 border-slate-400 text-slate-500">
         +
       </div>
 
-      <div className="border-r border-white/20 px-1 py-1">
+      <div className="border-r-2 border-slate-400 px-1 py-1">
         <input
           type="text"
           value={text}
@@ -1909,7 +1909,7 @@ function TypedRouteStopInput({
           onChange={(event) => setText(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Click and type route note, then Enter..."
-          className="w-full rounded border border-slate-800 bg-black px-2 py-1 text-[10px] font-semibold normal-case text-white outline-none placeholder:text-slate-600 focus:border-blue-400 disabled:cursor-wait disabled:opacity-60"
+          className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold normal-case text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-wait disabled:opacity-60"
         />
       </div>
 
@@ -1986,7 +1986,7 @@ function PickupBoardColumn({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden border-r ${PICKUP_COLUMN_COLOR.body} bg-black ${
+      className={`flex min-h-0 flex-col overflow-hidden border-r ${PICKUP_COLUMN_COLOR.body} bg-white ${
         dragOverColumnKey === columnKey && draggedItem?.sourceColumnKey !== columnKey
           ? 'ring-2 ring-blue-400'
           : ''
@@ -2024,24 +2024,24 @@ function PickupBoardColumn({
         </div>
       </div>
 
-      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/50 bg-slate-950 text-[8px] font-black uppercase tracking-wide text-white">
-        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+      <div className="grid flex-shrink-0 grid-cols-[18px_1fr_24px_28px_28px_34px] border-b-2 border-slate-400 bg-slate-100 text-[8px] font-black uppercase tracking-wide text-slate-700">
+        <div className="border-r-2 border-slate-400 px-0.5 py-1 text-center">
           ↕
         </div>
 
-        <div className="border-r border-white/40 px-1 py-1">
+        <div className="border-r-2 border-slate-400 px-1 py-1">
           Pickup
         </div>
 
-        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+        <div className="border-r-2 border-slate-400 px-0.5 py-1 text-center">
           SK
         </div>
 
-        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+        <div className="border-r-2 border-slate-400 px-0.5 py-1 text-center">
           CAN
         </div>
 
-        <div className="border-r border-white/40 px-0.5 py-1 text-center">
+        <div className="border-r-2 border-slate-400 px-0.5 py-1 text-center">
           DOC
         </div>
 
@@ -2052,7 +2052,7 @@ function PickupBoardColumn({
 
       <div
         className={`custom-board-scrollbar min-h-0 flex-1 overflow-y-auto ${
-          dragOverColumnKey === columnKey ? 'bg-blue-950/20' : ''
+          dragOverColumnKey === columnKey ? 'bg-blue-50' : ''
         }`}
         onDragOver={(event) => {
           event.preventDefault();
@@ -2156,12 +2156,12 @@ function CompactPickupRow({
     (shipment.notes || '').toLowerCase().includes('rush');
 
   const rowBackground = shipment.stays_in_canada
-    ? 'bg-red-950/80'
+    ? 'bg-red-600 text-white'
     : isHot
-      ? 'bg-red-950/50'
+      ? 'bg-red-50 text-slate-950'
       : isDragOver
-        ? 'bg-blue-950/70'
-        : 'bg-black';
+        ? 'bg-blue-50 text-slate-950'
+        : 'bg-white text-slate-950 odd:bg-white even:bg-slate-50';
 
   return (
     <div
@@ -2171,18 +2171,18 @@ function CompactPickupRow({
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className={`grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/30 text-white transition ${
+      className={`mb-1 grid min-h-[30px] grid-cols-[18px_1fr_24px_28px_28px_34px] rounded-sm border-2 border-blue-400 transition ${
         rowBackground
       } ${isDragging ? 'opacity-40' : ''} ${
         isDragBefore ? 'border-t-4 border-t-blue-400' : ''
       } ${
         isDragAfter ? 'border-b-4 border-b-blue-400' : ''
       } ${
-        isDragOver ? 'outline outline-1 outline-blue-400' : ''
+        isDragOver ? 'outline outline-2 outline-blue-500' : ''
       }`}
     >
       <div
-        className="flex cursor-grab items-center justify-center border-r border-white/30 bg-slate-900 text-slate-500 active:cursor-grabbing"
+        className="flex cursor-grab items-center justify-center border-r-2 border-slate-400 bg-slate-100 text-slate-500 active:cursor-grabbing"
         title="Drag to assign or reorder"
       >
         <GripVertical className="h-3 w-3" />
@@ -2192,7 +2192,7 @@ function CompactPickupRow({
         type="button"
         onClick={onEdit}
         disabled={disabled}
-        className="min-w-0 border-r border-white/30 px-1 py-0.5 text-left hover:bg-slate-900 disabled:cursor-wait disabled:opacity-60"
+        className="min-w-0 border-r-2 border-slate-400 px-1 py-0.5 text-left hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
         title="Click to edit pickup"
       >
         <div className="flex min-w-0 items-center gap-1">
@@ -2202,18 +2202,18 @@ function CompactPickupRow({
             </span>
           )}
 
-          <span className="truncate text-[10px] font-black uppercase leading-tight text-blue-200">
+          <span className="truncate text-[10px] font-black uppercase leading-tight text-inherit">
             {displayName}
           </span>
         </div>
 
-        <p className="truncate text-[8px] font-semibold uppercase leading-tight text-slate-500">
+        <p className="truncate text-[8px] font-semibold uppercase leading-tight text-inherit">
           {city || 'NO CITY'}
           {shipment.board_note ? ` • ${shipment.board_note}` : ''}
         </p>
       </button>
 
-      <div className="flex items-center justify-center border-r border-white/30 text-[10px] font-black text-slate-200">
+      <div className="flex items-center justify-center border-r-2 border-slate-400 text-[10px] font-black text-inherit">
         {skids || '-'}
       </div>
 
@@ -2221,10 +2221,10 @@ function CompactPickupRow({
         type="button"
         onClick={onToggleCanada}
         disabled={disabled}
-        className={`flex items-center justify-center border-r border-white/30 text-[7px] font-black disabled:cursor-wait disabled:opacity-60 ${
+        className={`flex items-center justify-center border-r-2 border-slate-400 text-[7px] font-black disabled:cursor-wait disabled:opacity-60 ${
           shipment.stays_in_canada
             ? 'bg-red-700 text-white'
-            : 'bg-slate-950 text-slate-600 hover:bg-slate-800'
+            : 'bg-white text-slate-500 hover:bg-slate-100'
         }`}
         title="Toggle Canada"
       >
@@ -2235,10 +2235,10 @@ function CompactPickupRow({
         type="button"
         onClick={onToggleDocs}
         disabled={disabled}
-        className={`flex items-center justify-center border-r border-white/30 disabled:cursor-wait disabled:opacity-60 ${
+        className={`flex items-center justify-center border-r-2 border-slate-400 disabled:cursor-wait disabled:opacity-60 ${
           shipment.customs_docs_received
-            ? 'bg-green-800 text-green-100'
-            : 'bg-red-900/70 text-red-100'
+            ? 'bg-green-100 text-green-800'
+            : 'bg-red-100 text-red-800'
         }`}
         title="Toggle docs received"
       >
@@ -2254,7 +2254,7 @@ function CompactPickupRow({
           type="button"
           onClick={onEdit}
           disabled={disabled}
-          className="flex flex-1 items-center justify-center border-r border-white/20 text-blue-200 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          className="flex flex-1 items-center justify-center border-r-2 border-slate-400 text-blue-700 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
           title="Edit pickup"
         >
           <Edit2 className="h-3 w-3" />
@@ -2264,7 +2264,7 @@ function CompactPickupRow({
           type="button"
           onClick={onAssign}
           disabled={disabled}
-          className="flex flex-1 items-center justify-center text-[8px] font-black text-blue-200 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          className="flex flex-1 items-center justify-center text-[8px] font-black text-blue-700 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
           title="Assign pickup"
         >
           GO
@@ -2320,7 +2320,7 @@ function BoardShipmentRow({
   const isBoardOnlyStop = shipment.dispatch_task_type === 'board_stop';
   const displayName = getBoardDisplayName(shipment, 'truck');
 
-  const city = shipment.delivery_city || shipment.pickup_city;
+  const city = shipment.pickup_city || shipment.delivery_city;
 
   const metaParts =
     isBoardOnlyStop
@@ -2359,24 +2359,18 @@ function BoardShipmentRow({
       (shipment.notes || '').toLowerCase().includes('rush'));
 
   const rowBackground = shipment.route_completed
-    ? 'bg-green-950/80'
+    ? 'bg-green-100 text-slate-950'
     : shipment.stays_in_canada
-      ? 'bg-red-950/80'
+      ? 'bg-red-600 text-white'
       : isBoardOnlyStop
-        ? 'bg-slate-950'
+        ? 'bg-slate-100 text-slate-950'
         : isDragOver
-          ? 'bg-blue-950/70'
-          : 'bg-black';
+          ? 'bg-blue-50 text-slate-950'
+          : 'bg-white text-slate-950 odd:bg-white even:bg-slate-50';
 
   const nameColour = shipment.route_completed
-    ? 'text-green-200 line-through decoration-green-300/80'
-    : shipment.stays_in_canada
-      ? 'text-red-100'
-      : isBoardOnlyStop
-        ? 'text-white'
-        : isHot
-          ? 'text-red-200'
-          : accentClassName;
+    ? 'text-inherit line-through decoration-slate-600/80'
+    : 'text-inherit';
 
   return (
     <div
@@ -2386,24 +2380,24 @@ function BoardShipmentRow({
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className={`grid min-h-[54px] grid-cols-[18px_1fr_38px] border-b border-white/40 text-[11px] font-bold uppercase text-white transition ${
+      className={`mb-1 grid min-h-[54px] grid-cols-[18px_1fr_38px] rounded-sm border-2 border-slate-500 text-[11px] font-bold uppercase transition ${
         rowBackground
       } ${isDragging ? 'opacity-40' : ''} ${
         isDragBefore ? 'border-t-4 border-t-blue-400' : ''
       } ${
         isDragAfter ? 'border-b-4 border-b-blue-400' : ''
       } ${
-        isDragOver ? 'outline outline-1 outline-blue-400' : ''
+        isDragOver ? 'outline outline-2 outline-blue-500' : ''
       }`}
     >
       <div
-        className="flex cursor-grab items-center justify-center border-r border-white/40 bg-slate-900 text-slate-500 active:cursor-grabbing"
+        className="flex cursor-grab items-center justify-center border-r-2 border-slate-400 bg-slate-100 text-slate-500 active:cursor-grabbing"
         title="Drag to move this stop"
       >
         <GripVertical className="h-3.5 w-3.5" />
       </div>
 
-      <div className="min-w-0 border-r border-white/40 px-1.5 py-1">
+      <div className="min-w-0 border-r-2 border-slate-400 px-1.5 py-1">
         <div className="flex min-w-0 items-start justify-between gap-1">
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1">
@@ -2425,31 +2419,31 @@ function BoardShipmentRow({
             </div>
 
             {referenceParts.length > 0 && (
-              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-500">
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                 {referenceParts.join(' • ')}
               </p>
             )}
 
             {metaParts.length > 0 && (
-              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-400">
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                 {metaParts.join(' • ')}
               </p>
             )}
 
             {boardDisplaySettings.showBoardNote && shipment.board_note && (
-              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-yellow-200">
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                 {shipment.board_note}
               </p>
             )}
 
             {boardDisplaySettings.showNormalNotes && shipment.notes && (
-              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-slate-500">
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                 Note: {shipment.notes}
               </p>
             )}
 
             {boardDisplaySettings.showInternalNotes && shipment.internal_notes && (
-              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-purple-300">
+              <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                 Internal: {shipment.internal_notes}
               </p>
             )}
@@ -2457,7 +2451,7 @@ function BoardShipmentRow({
             {boardDisplaySettings.showFinDetails &&
               shipment.route_completed &&
               shipment.route_completed_by && (
-                <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-green-300">
+                <p className="mt-0.5 truncate text-[8px] font-bold leading-tight text-inherit">
                   FIN by {shipment.route_completed_by}
                 </p>
               )}
@@ -2478,7 +2472,7 @@ function BoardShipmentRow({
             }}
             onDragStart={(event) => event.stopPropagation()}
             placeholder="Board note..."
-            className="mt-1 w-full rounded border border-slate-800 bg-black px-1 py-0.5 text-[9px] font-semibold normal-case text-white outline-none placeholder:text-slate-700 focus:border-blue-400 disabled:cursor-wait disabled:opacity-60"
+            className="mt-1 w-full rounded border border-slate-300 bg-white px-1 py-0.5 text-[9px] font-semibold normal-case text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-wait disabled:opacity-60"
           />
         )}
       </div>
@@ -2489,8 +2483,8 @@ function BoardShipmentRow({
         disabled={disabled}
         className={`flex items-center justify-center text-[9px] font-black disabled:cursor-wait disabled:opacity-60 ${
           shipment.route_completed
-            ? 'bg-green-700 text-white'
-            : 'bg-slate-950 text-slate-500 hover:bg-slate-800'
+            ? 'bg-green-600 text-white'
+            : 'bg-white text-slate-500 hover:bg-slate-100'
         }`}
         title={actionTitle}
       >
@@ -2506,10 +2500,10 @@ function EmptyTruckRows({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="grid min-h-[28px] grid-cols-[18px_1fr_38px] border-b border-white/10 text-[9px] text-slate-800"
+          className="grid min-h-[28px] grid-cols-[18px_1fr_38px] border-b border-slate-200 text-[9px] text-slate-400"
         >
-          <div className="border-r border-white/10" />
-          <div className="border-r border-white/10 px-1 py-1">
+          <div className="border-r border-slate-200" />
+          <div className="border-r border-slate-200 px-1 py-1">
             {index === 0 ? 'Drop at bottom' : ''}
           </div>
           <div />
@@ -2525,15 +2519,15 @@ function EmptyPickupRows({ count }: { count: number }) {
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="grid min-h-[28px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-white/10 text-[9px] text-slate-800"
+          className="grid min-h-[28px] grid-cols-[18px_1fr_24px_28px_28px_34px] border-b border-slate-200 text-[9px] text-slate-400"
         >
-          <div className="border-r border-white/10" />
-          <div className="border-r border-white/10 px-1 py-1">
+          <div className="border-r border-slate-200" />
+          <div className="border-r border-slate-200 px-1 py-1">
             {index === 0 ? 'Drop at bottom' : ''}
           </div>
-          <div className="border-r border-white/10" />
-          <div className="border-r border-white/10" />
-          <div className="border-r border-white/10" />
+          <div className="border-r border-slate-200" />
+          <div className="border-r border-slate-200" />
+          <div className="border-r border-slate-200" />
           <div />
         </div>
       ))}
@@ -2543,8 +2537,8 @@ function EmptyPickupRows({ count }: { count: number }) {
 
 function SmallCompanyPreview({ company }: { company: Company }) {
   return (
-    <div className="mt-2 rounded-lg border border-dark-border bg-slate-950 p-3 text-xs text-slate-400">
-      <p className="font-semibold text-slate-200">
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-dark-border dark:bg-slate-950 dark:text-slate-400">
+      <p className="font-semibold text-slate-950 dark:text-slate-200">
         {company.name}
       </p>
 
@@ -2608,25 +2602,24 @@ function getBoardDisplayName(shipment: Shipment, context: 'truck' | 'pickup') {
     return shipment.board_name;
   }
 
-  if (context === 'truck') {
-    if (shipment.delivery_company_name && shipment.delivery_company_name.trim() !== '') {
-      return shipment.delivery_company_name;
-    }
-
-    if (shipment.pickup_company_name && shipment.pickup_company_name.trim() !== '') {
-      return shipment.pickup_company_name;
-    }
-  }
-
   if (shipment.pickup_company_name && shipment.pickup_company_name.trim() !== '') {
     return shipment.pickup_company_name;
+  }
+
+  if (context === 'truck') {
+    return (
+      shipment.customer_company_name ||
+      shipment.work_order_number ||
+      shipment.delivery_company_name ||
+      'Stop'
+    );
   }
 
   return (
     shipment.customer_company_name ||
     shipment.work_order_number ||
     shipment.delivery_company_name ||
-    'Stop'
+    'Pickup'
   );
 }
 

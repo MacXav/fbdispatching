@@ -405,9 +405,9 @@ export default function RoutingPlannerPage() {
           subtitle="Clean truck grouping for Freightboy Warehouse, Buffalo, and regular deliveries"
         />
 
-        <div className="rounded-2xl border border-dark-border bg-dark-card p-10 text-center">
-          <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-300" />
-          <p className="text-sm text-slate-300">Loading routing planner...</p>
+        <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-10 text-center">
+          <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-700 dark:text-blue-300" />
+          <p className="text-sm text-slate-700 dark:text-slate-300">Loading routing planner...</p>
         </div>
       </MainLayout>
     );
@@ -421,19 +421,19 @@ export default function RoutingPlannerPage() {
       />
 
       <div className="space-y-5">
-        <div className="rounded-2xl border border-dark-border bg-dark-card p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-blue-950 p-3">
-                  <MapPinned className="h-6 w-6 text-blue-300" />
+                <div className="rounded-xl bg-blue-50 dark:bg-blue-950 p-3">
+                  <MapPinned className="h-6 w-6 text-blue-700 dark:text-blue-300" />
                 </div>
 
                 <div>
-                  <h2 className="text-xl font-black text-white">
+                  <h2 className="text-xl font-black text-slate-950 dark:text-white">
                     Route bucket planner
                   </h2>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Freightboy Warehouse stays together. Buffalo stays together. Everything else fills in after.
                   </p>
                 </div>
@@ -530,10 +530,10 @@ function CurrentLayout({
 }) {
   if (activeTrucks.length === 0) {
     return (
-      <div className="rounded-2xl border border-dark-border bg-dark-card p-8 text-center">
-        <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-500" />
-        <p className="font-semibold text-white">No active assigned trucks yet.</p>
-        <p className="mt-1 text-sm text-slate-400">
+      <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-8 text-center">
+        <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-500 dark:text-slate-500" />
+        <p className="font-semibold text-slate-950 dark:text-white">No active assigned trucks yet.</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Assign freight on the truck board first, then come back here.
         </p>
       </div>
@@ -542,11 +542,11 @@ function CurrentLayout({
 
   return (
     <div className="w-full">
-      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+      <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-white">Current trucks</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="text-xl font-black text-slate-950 dark:text-white">Current trucks</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Simple view of what is currently assigned before route analysis.
             </p>
           </div>
@@ -574,23 +574,23 @@ function CurrentLayout({
             return (
               <div
                 key={truck.id}
-                className="rounded-2xl border border-dark-border bg-slate-950 p-4"
+                className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 p-4"
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-2xl font-black text-white">
+                    <h3 className="text-2xl font-black text-slate-950 dark:text-white">
                       {truck.truck_number}
                     </h3>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       {truck.driver_name || 'No driver'}
                     </p>
                   </div>
 
                   <div className="text-right">
-                    <p className="text-sm font-bold text-blue-300">
+                    <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
                       {truckFreight.length} stops
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 dark:text-slate-500">
                       {totalSkids} skids • {totalWeight.toLocaleString()} lbs
                     </p>
                   </div>
@@ -601,7 +601,7 @@ function CurrentLayout({
                     {buckets.map((bucket) => (
                       <span
                         key={bucket.key}
-                        className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold text-slate-200"
+                        className="rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-1 text-xs font-bold text-slate-800 dark:text-slate-200"
                       >
                         {bucket.label}: {bucket.count}
                       </span>
@@ -679,18 +679,18 @@ function PlannerResults({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+      <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-300">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">
               Route analysis complete
             </p>
 
-            <h2 className="mt-1 text-2xl font-black text-white">
+            <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
               Review the plan before applying
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Start with dock moves. Then open a truck card and calculate its Google route.
             </p>
           </div>
@@ -753,10 +753,10 @@ function PlannerResults({
       </div>
 
       {bucketSummary.length > 0 && (
-        <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+        <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
           <div className="mb-4">
-            <h2 className="text-xl font-black text-white">Route groups</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="text-xl font-black text-slate-950 dark:text-white">Route groups</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               Quick view of what type of freight each truck is getting.
             </p>
           </div>
@@ -770,21 +770,21 @@ function PlannerResults({
       )}
 
       {result.missingLocationStops.length > 0 && (
-        <details className="rounded-2xl border border-yellow-900 bg-yellow-950/30 p-5">
+        <details className="rounded-2xl border border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 p-5">
           <summary className="cursor-pointer list-none">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="flex items-center gap-2 text-lg font-black text-yellow-100">
+                <h2 className="flex items-center gap-2 text-lg font-black text-amber-900 dark:text-yellow-100">
                   <AlertTriangle className="h-5 w-5" />
                   {result.missingLocationStops.length} stop(s) skipped because GPS is missing
                 </h2>
 
-                <p className="mt-1 text-sm text-yellow-100/80">
+                <p className="mt-1 text-sm text-amber-900 dark:text-yellow-100/80">
                   Click to view them. Run Fix GPS, refresh, and analyze again.
                 </p>
               </div>
 
-              <span className="flex items-center gap-2 rounded-full border border-yellow-800 bg-yellow-900/40 px-3 py-1 text-xs font-black text-yellow-100">
+              <span className="flex items-center gap-2 rounded-full border border-yellow-800 bg-yellow-900/40 px-3 py-1 text-xs font-black text-amber-900 dark:text-yellow-100">
                 Show skipped stops
                 <ChevronDown className="h-3 w-3" />
               </span>
@@ -795,17 +795,17 @@ function PlannerResults({
             {result.missingLocationStops.map((item) => (
               <div
                 key={item.shipment.id}
-                className="rounded-xl border border-yellow-900/80 bg-black/30 p-3"
+                className="rounded-xl border border-yellow-200 dark:border-yellow-900/80 bg-black/30 p-3"
               >
-                <p className="font-bold text-yellow-100">
+                <p className="font-bold text-amber-900 dark:text-yellow-100">
                   {getPickupDisplayName(item.shipment)}
                 </p>
 
-                <p className="mt-1 text-xs text-yellow-100/70">
+                <p className="mt-1 text-xs text-amber-900 dark:text-yellow-100/70">
                   To: {getDeliveryDisplayName(item.shipment)}
                 </p>
 
-                <p className="mt-1 text-xs text-yellow-100/70">
+                <p className="mt-1 text-xs text-amber-900 dark:text-yellow-100/70">
                   Current truck: {item.truckNumber}
                 </p>
               </div>
@@ -815,12 +815,12 @@ function PlannerResults({
       )}
 
       {result.crossDockMoves.length === 0 ? (
-        <div className="rounded-2xl border border-green-900 bg-green-950/30 p-5">
-          <p className="text-lg font-black text-green-100">
+        <div className="rounded-2xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30 p-5">
+          <p className="text-lg font-black text-green-900 dark:text-green-100">
             No cross-dock moves needed.
           </p>
 
-          <p className="mt-1 text-sm text-green-100/70">
+          <p className="mt-1 text-sm text-green-900 dark:text-green-100/70">
             The current truck layout already matches the available GPS and route bucket rules.
           </p>
         </div>
@@ -828,26 +828,26 @@ function PlannerResults({
         <CleanDockMovesPanel result={result} />
       )}
 
-      <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+      <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-xl font-black text-white">
+            <h2 className="text-xl font-black text-slate-950 dark:text-white">
               Final truck board
             </h2>
 
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Cards start closed. Open a truck to calculate its Google route.
             </p>
           </div>
 
-          <p className="text-sm font-semibold text-slate-400">
+          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
             {result.truckPlans.length} trucks total
           </p>
         </div>
 
         {trucksWithMoves.length > 0 && (
           <div className="mb-6">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-blue-300">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">
               Trucks with changes
             </p>
 
@@ -867,20 +867,20 @@ function PlannerResults({
         )}
 
         {trucksWithoutMoves.length > 0 && (
-          <details className="rounded-2xl border border-dark-border bg-slate-950/60 p-4">
+          <details className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-white dark:bg-slate-950/60 p-4">
             <summary className="cursor-pointer list-none">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-black text-white">
+                  <p className="font-black text-slate-950 dark:text-white">
                     Trucks with no changes
                   </p>
 
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     {trucksWithoutMoves.length} truck(s) stay the same.
                   </p>
                 </div>
 
-                <span className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-black text-slate-300">
+                <span className="flex items-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
                   Show
                   <ChevronDown className="h-3 w-3" />
                 </span>
@@ -917,11 +917,11 @@ function AnalyzeStatCard({
   tone: 'blue' | 'green' | 'yellow' | 'purple' | 'slate';
 }) {
   const toneClasses = {
-    blue: 'border-blue-900 bg-blue-950/30 text-blue-200',
-    green: 'border-green-900 bg-green-950/30 text-green-200',
-    yellow: 'border-yellow-900 bg-yellow-950/30 text-yellow-200',
+    blue: 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-200',
+    green: 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-200',
+    yellow: 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30 text-amber-800 dark:text-yellow-200',
     purple: 'border-purple-900 bg-purple-950/30 text-purple-200',
-    slate: 'border-dark-border bg-slate-950 text-slate-200',
+    slate: 'border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200',
   };
 
   return (
@@ -930,7 +930,7 @@ function AnalyzeStatCard({
         {label}
       </p>
 
-      <p className="mt-2 text-3xl font-black text-white">
+      <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">
         {value}
       </p>
 
@@ -959,30 +959,30 @@ function RouteGroupSummaryCard({
     <div
       className={`rounded-2xl border p-4 ${
         isWarehouse
-          ? 'border-blue-900 bg-blue-950/30'
+          ? 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-50 dark:bg-blue-950/30'
           : isBuffalo
             ? 'border-purple-900 bg-purple-950/30'
-            : 'border-dark-border bg-slate-950'
+            : 'border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-lg font-black text-white">
+          <p className="truncate text-lg font-black text-slate-950 dark:text-white">
             {bucket.label}
           </p>
 
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {bucket.count} stops • {bucket.skids} skids
           </p>
         </div>
 
-        <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-black text-slate-200">
+        <span className="rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-1 text-xs font-black text-slate-800 dark:text-slate-200">
           {bucket.truckNumbers.length} truck
           {bucket.truckNumbers.length === 1 ? '' : 's'}
         </span>
       </div>
 
-      <p className="mt-3 text-sm font-semibold text-blue-300">
+      <p className="mt-3 text-sm font-semibold text-blue-700 dark:text-blue-300">
         {bucket.truckNumbers.join(', ')}
       </p>
     </div>
@@ -993,19 +993,19 @@ function CleanDockMovesPanel({ result }: { result: PlannerResult }) {
   const movesByFromTruck = groupMovesByFromTruck(result.crossDockMoves);
 
   return (
-    <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+    <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
       <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-white">
+          <h2 className="text-xl font-black text-slate-950 dark:text-white">
             Dock moves
           </h2>
 
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Work from top to bottom. Each section shows what comes off one truck.
           </p>
         </div>
 
-        <p className="text-sm font-semibold text-blue-300">
+        <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
           {result.crossDockMoves.length} total move
           {result.crossDockMoves.length === 1 ? '' : 's'}
         </p>
@@ -1015,26 +1015,26 @@ function CleanDockMovesPanel({ result }: { result: PlannerResult }) {
         {movesByFromTruck.map((group) => (
           <div
             key={group.fromTruckId}
-            className="rounded-2xl border border-dark-border bg-slate-950 p-4"
+            className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 p-4"
           >
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-red-300">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-red-700 dark:text-red-300">
                   Take off
                 </p>
 
-                <h3 className="text-2xl font-black text-white">
+                <h3 className="text-2xl font-black text-slate-950 dark:text-white">
                   Truck {group.fromTruckNumber}
                 </h3>
               </div>
 
-              <div className="rounded-xl border border-red-900 bg-red-950/30 px-4 py-2 text-right">
-                <p className="text-sm font-black text-red-100">
+              <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-50 dark:bg-red-950/30 px-4 py-2 text-right">
+                <p className="text-sm font-black text-red-900 dark:text-red-100">
                   {group.moves.length} move
                   {group.moves.length === 1 ? '' : 's'}
                 </p>
 
-                <p className="text-xs text-red-100/70">
+                <p className="text-xs text-red-900 dark:text-red-100/70">
                   {group.skids} skids • {group.weightLbs.toLocaleString()} lbs
                 </p>
               </div>
@@ -1054,30 +1054,30 @@ function CleanDockMovesPanel({ result }: { result: PlannerResult }) {
 
 function CleanDockMoveRow({ move }: { move: CrossDockMove }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-900 p-3">
+    <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900 p-3">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-white">
+          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
             {getPickupDisplayName(move.shipment)}
           </p>
 
-          <p className="mt-1 truncate text-xs text-blue-300">
+          <p className="mt-1 truncate text-xs text-blue-700 dark:text-blue-300">
             To: {getDeliveryDisplayName(move.shipment)}
           </p>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
             {getRouteBucket(move.shipment).label} • {move.skids} skids • {move.weightLbs.toLocaleString()} lbs
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-xl border border-green-900 bg-green-950/30 px-3 py-2">
-          <span className="text-xs font-black text-red-200">
+        <div className="flex items-center gap-2 rounded-xl border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30 px-3 py-2">
+          <span className="text-xs font-black text-red-700 dark:text-red-200">
             {move.fromTruckNumber}
           </span>
 
-          <ArrowRight className="h-4 w-4 text-slate-400" />
+          <ArrowRight className="h-4 w-4 text-slate-600 dark:text-slate-400" />
 
-          <span className="text-sm font-black text-green-100">
+          <span className="text-sm font-black text-green-900 dark:text-green-100">
             {move.toTruckNumber}
           </span>
         </div>
@@ -1121,30 +1121,30 @@ function FinalTruckPlanCard({
     <details
       className={`rounded-2xl border p-4 ${
         priority
-          ? 'border-blue-900 bg-blue-950/20'
-          : 'border-dark-border bg-slate-950'
+          ? 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-50 dark:bg-blue-950/20'
+          : 'border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950'
       }`}
     >
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-2xl font-black text-white">
+              <h3 className="text-2xl font-black text-slate-950 dark:text-white">
                 {plan.truck.truck_number}
               </h3>
 
               {movingIn.length + movingOut.length > 0 ? (
-                <span className="rounded-full border border-blue-800 bg-blue-900/40 px-2 py-1 text-[10px] font-black text-blue-100">
+                <span className="rounded-full border border-blue-800 bg-blue-900/40 px-2 py-1 text-[10px] font-black text-blue-900 dark:text-blue-100">
                   CHANGES
                 </span>
               ) : (
-                <span className="rounded-full border border-green-800 bg-green-900/30 px-2 py-1 text-[10px] font-black text-green-100">
+                <span className="rounded-full border border-green-300 dark:border-green-800 bg-green-900/30 px-2 py-1 text-[10px] font-black text-green-900 dark:text-green-100">
                   SAME
                 </span>
               )}
             </div>
 
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               {plan.truck.driver_name || 'No driver'}
             </p>
 
@@ -1163,30 +1163,30 @@ function FinalTruckPlanCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dark-border bg-slate-900 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900 px-3 py-2">
           <p
             className={`text-xs font-semibold ${
-              overWeight || overSkids ? 'text-red-300' : 'text-slate-400'
+              overWeight || overSkids ? 'text-red-700 dark:text-red-300' : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             Final load: {plan.suggestedSkids}/{plan.truck.capacity_skids || 12} skids •{' '}
             {plan.suggestedWeightLbs.toLocaleString()}/{(plan.truck.max_weight_lbs || 15000).toLocaleString()} lbs
           </p>
 
-          <ChevronDown className="h-4 w-4 text-slate-500" />
+          <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-500" />
         </div>
       </summary>
 
       <div className="mt-4 space-y-4">
-        <div className="rounded-2xl border border-blue-900 bg-blue-950/20 p-4">
+        <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-50 dark:bg-blue-950/20 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-blue-200">
+              <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-200">
                 <Route className="h-4 w-4" />
                 Google route
               </p>
 
-              <p className="mt-1 text-xs text-blue-100/70">
+              <p className="mt-1 text-xs text-blue-900 dark:text-blue-100/70">
                 Calculates road distance and drive time for this truck using the final suggested stops.
               </p>
             </div>
@@ -1203,37 +1203,37 @@ function FinalTruckPlanCard({
           </div>
 
           {plan.suggestedStops.length < 2 && (
-            <p className="mt-3 text-xs text-yellow-200">
+            <p className="mt-3 text-xs text-amber-800 dark:text-yellow-200">
               This truck needs at least two GPS-ready stops to calculate a route.
             </p>
           )}
 
           {plan.suggestedStops.length > 27 && (
-            <p className="mt-3 text-xs text-yellow-200">
+            <p className="mt-3 text-xs text-amber-800 dark:text-yellow-200">
               This truck has more than 27 stops, so split it before calculating a Google route.
             </p>
           )}
 
           {googleRouteEstimate && (
             <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
-              <div className="rounded-xl border border-blue-900 bg-slate-950 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+              <div className="rounded-xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-slate-950 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-500">
                   Distance
                 </p>
-                <p className="mt-1 text-2xl font-black text-white">
+                <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                   {googleRouteEstimate.distanceText}
                 </p>
 
-                <p className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">
+                <p className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-500">
                   Drive time
                 </p>
-                <p className="mt-1 text-2xl font-black text-white">
+                <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                   {googleRouteEstimate.durationText}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-950 p-4">
-                <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">
+              <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 p-4">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-500">
                   Google optimized stop order
                 </p>
 
@@ -1241,13 +1241,13 @@ function FinalTruckPlanCard({
                   {googleRouteEstimate.orderedStops.map((stop, index) => (
                     <div
                       key={`${stop.shipmentId}-${index}`}
-                      className="flex items-center gap-3 rounded-lg border border-dark-border bg-slate-900 px-3 py-2"
+                      className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900 px-3 py-2"
                     >
-                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-900 text-xs font-black text-blue-100">
+                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-900 text-xs font-black text-blue-900 dark:text-blue-100">
                         {index + 1}
                       </span>
 
-                      <p className="truncate text-sm font-semibold text-white">
+                      <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
                         {stop.label}
                       </p>
                     </div>
@@ -1293,13 +1293,13 @@ function FinalTruckPlanCard({
         )}
 
         <div>
-          <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-500">
             Final load
           </p>
 
           {plan.suggestedStops.length === 0 ? (
-            <div className="rounded-xl border border-dark-border bg-black/40 p-4">
-              <p className="text-sm text-slate-500">
+            <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-black/40 p-4">
+              <p className="text-sm text-slate-500 dark:text-slate-500">
                 No freight suggested for this truck.
               </p>
             </div>
@@ -1335,10 +1335,10 @@ function TruckTinyStat({
   tone: 'red' | 'green' | 'blue' | 'slate';
 }) {
   const toneClasses = {
-    red: 'border-red-900 bg-red-950/30 text-red-100',
-    green: 'border-green-900 bg-green-950/30 text-green-100',
-    blue: 'border-blue-900 bg-blue-950/30 text-blue-100',
-    slate: 'border-dark-border bg-slate-900 text-slate-200',
+    red: 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-50 dark:bg-red-950/30 text-red-900 dark:text-red-100',
+    green: 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30 text-green-900 dark:text-green-100',
+    blue: 'border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100',
+    slate: 'border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200',
   };
 
   return (
@@ -1347,7 +1347,7 @@ function TruckTinyStat({
         {label}
       </p>
 
-      <p className="mt-1 text-lg font-black text-white">
+      <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>
@@ -1367,13 +1367,13 @@ function FinalMoveCard({
     <div className="rounded-xl border border-black/30 bg-black/30 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-white">
+          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
             {getPickupDisplayName(stop.shipment)}
           </p>
-          <p className="mt-1 truncate text-xs text-blue-300">
+          <p className="mt-1 truncate text-xs text-blue-700 dark:text-blue-300">
             To: {getDeliveryDisplayName(stop.shipment)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
             {stop.routeBucketLabel} • {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
           </p>
         </div>
@@ -1405,21 +1405,21 @@ function FinalStopCard({
     <div
       className={`rounded-xl border p-3 ${
         tone === 'green'
-          ? 'border-green-800 bg-green-950/40'
-          : 'border-dark-border bg-slate-900'
+          ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-50 dark:bg-green-950/40'
+          : 'border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-white">
+          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
             {getPickupDisplayName(stop.shipment)}
           </p>
 
-          <p className="mt-1 truncate text-xs text-blue-300">
+          <p className="mt-1 truncate text-xs text-blue-700 dark:text-blue-300">
             To: {getDeliveryDisplayName(stop.shipment)}
           </p>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
             {stop.routeBucketLabel} • {stop.skids} skids • {stop.weightLbs.toLocaleString()} lbs
           </p>
         </div>
@@ -1437,7 +1437,7 @@ function FinalStopCard({
 
           {stop.locked && (
             <span title="Locked by dispatch">
-              <Lock className="h-4 w-4 text-yellow-300" />
+              <Lock className="h-4 w-4 text-amber-700 dark:text-yellow-300" />
             </span>
           )}
         </div>
@@ -1458,16 +1458,16 @@ function ShipmentMiniCard({
   statusTone: 'green' | 'red';
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-900 p-3">
+    <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-slate-900 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-white">
+          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
             {getPickupDisplayName(shipment)}
           </p>
-          <p className="mt-1 truncate text-xs text-blue-300">
+          <p className="mt-1 truncate text-xs text-blue-700 dark:text-blue-300">
             To: {getDeliveryDisplayName(shipment)}
           </p>
-          <p className="mt-1 truncate text-xs text-slate-500">
+          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-500">
             {displayLocation(shipment.delivery_address, shipment.delivery_city)}
           </p>
           <p className="mt-1 text-xs text-purple-300">{bucketLabel}</p>
@@ -1476,8 +1476,8 @@ function ShipmentMiniCard({
         <span
           className={`flex-shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ${
             statusTone === 'green'
-              ? 'bg-green-800 text-green-100'
-              : 'bg-red-800 text-red-100'
+              ? 'bg-green-800 text-green-900 dark:text-green-100'
+              : 'bg-red-800 text-red-900 dark:text-red-100'
           }`}
         >
           {statusLabel}
@@ -1497,17 +1497,17 @@ function GeocodeSummary({
   const errorCount = logs.filter((log) => log.status === 'error').length;
 
   return (
-    <details className="rounded-2xl border border-dark-border bg-dark-card p-5">
+    <details className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5">
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-white">Latest GPS results</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="text-lg font-black text-slate-950 dark:text-white">Latest GPS results</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               {successCount} saved • {skippedCount} skipped • {errorCount} failed
             </p>
           </div>
 
-          <p className="flex items-center gap-2 text-sm font-semibold text-blue-300">
+          <p className="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
             Click to show details
             <ChevronDown className="h-4 w-4" />
           </p>
@@ -1520,15 +1520,15 @@ function GeocodeSummary({
             key={`${log.shipmentId}-${log.status}-${index}`}
             className={`rounded-xl border p-3 ${
               log.status === 'success'
-                ? 'border-green-900 bg-green-950/30'
+                ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30'
                 : log.status === 'skipped'
-                  ? 'border-yellow-900 bg-yellow-950/30'
-                  : 'border-red-900 bg-red-950/30'
+                  ? 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/30'
+                  : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-50 dark:bg-red-950/30'
             }`}
           >
-            <p className="font-bold text-white">{log.label}</p>
-            <p className="mt-1 truncate text-xs text-slate-400">{log.address}</p>
-            <p className="mt-1 text-xs text-slate-300">{log.message}</p>
+            <p className="font-bold text-slate-950 dark:text-white">{log.label}</p>
+            <p className="mt-1 truncate text-xs text-slate-600 dark:text-slate-400">{log.address}</p>
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">{log.message}</p>
           </div>
         ))}
       </div>
@@ -1544,9 +1544,9 @@ function RuleCard({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-950 p-4">
-      <p className="font-black text-white">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
+    <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 p-4">
+      <p className="font-black text-slate-950 dark:text-white">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{description}</p>
     </div>
   );
 }
@@ -1566,14 +1566,14 @@ function MoveColumn({
     <div
       className={`rounded-2xl border p-4 ${
         tone === 'red'
-          ? 'border-red-900 bg-red-950/30'
-          : 'border-green-900 bg-green-950/30'
+          ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-50 dark:bg-red-950/30'
+          : 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-50 dark:bg-green-950/30'
       }`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <p
           className={`text-sm font-black uppercase tracking-wide ${
-            tone === 'red' ? 'text-red-200' : 'text-green-200'
+            tone === 'red' ? 'text-red-700 dark:text-red-200' : 'text-green-700 dark:text-green-200'
           }`}
         >
           {title}
@@ -1581,8 +1581,8 @@ function MoveColumn({
         <span
           className={`rounded-full px-2 py-1 text-xs font-black ${
             tone === 'red'
-              ? 'bg-red-900 text-red-100'
-              : 'bg-green-900 text-green-100'
+              ? 'bg-red-900 text-red-900 dark:text-red-100'
+              : 'bg-green-900 text-green-900 dark:text-green-100'
           }`}
         >
           {count}
@@ -1595,7 +1595,7 @@ function MoveColumn({
 }
 
 function EmptyMoveText({ text }: { text: string }) {
-  return <p className="text-sm text-slate-400">{text}</p>;
+  return <p className="text-sm text-slate-600 dark:text-slate-400">{text}</p>;
 }
 
 function SummaryBox({
@@ -1606,12 +1606,12 @@ function SummaryBox({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-950 px-4 py-3">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-slate-950 px-4 py-3">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-500">
         {label}
       </p>
 
-      <p className="mt-1 text-2xl font-black text-white">
+      <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>

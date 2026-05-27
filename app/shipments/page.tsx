@@ -323,7 +323,7 @@ export default function PickupsPage() {
         postal_code: null,
         contact_name: null,
         contact_phone: null,
-        notes: 'Created from pickup/dispatch task form. Address/details need to be completed later.',
+        notes: null,
         is_shipper: field === 'pickup',
       } as Omit<Company, 'id' | 'created_at' | 'updated_at'>);
 
@@ -632,7 +632,7 @@ export default function PickupsPage() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-dark-border bg-dark-card p-4 lg:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark lg:grid-cols-3">
         <FilterButtonGroup
           label="Status"
           value={activeFilter}
@@ -668,15 +668,15 @@ export default function PickupsPage() {
       </div>
 
       {selectedShipmentIds.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2 rounded-xl border border-red-800 bg-red-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm font-semibold text-red-100">
+        <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm dark:border-red-800 dark:bg-red-950/40 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-red-800 dark:text-red-100">
             {selectedShipmentIds.length} pickup(s) selected.
           </p>
 
           <button
             type="button"
             onClick={() => setSelectedShipmentIds([])}
-            className="text-sm font-semibold text-red-200 hover:text-white"
+            className="text-sm font-semibold text-red-700 hover:text-red-900 dark:text-red-200 dark:hover:text-white"
           >
             Clear selection
           </button>
@@ -685,7 +685,7 @@ export default function PickupsPage() {
 
       {showForm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/60"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               resetForm();
@@ -693,16 +693,16 @@ export default function PickupsPage() {
           }}
         >
           <div
-            className="custom-board-scrollbar max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-5 shadow-2xl sm:p-8"
+            className="custom-board-scrollbar max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-dark-border dark:bg-dark-card sm:p-8"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-black text-slate-950 dark:text-white">
                   {editingId ? 'Edit Pickup' : 'Create Pickup'}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   This creates a dispatch task for the truck board. It does not need a work order.
                 </p>
               </div>
@@ -710,15 +710,15 @@ export default function PickupsPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Pickup / Delivery
                 </h3>
 
@@ -772,8 +772,8 @@ export default function PickupsPage() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Freight Details
                 </h3>
 
@@ -823,7 +823,7 @@ export default function PickupsPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Notes
                     </label>
 
@@ -840,8 +840,8 @@ export default function PickupsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Pickup Flags
                 </h3>
 
@@ -856,8 +856,8 @@ export default function PickupsPage() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       formData.customs_docs_received
-                        ? 'border-green-700 bg-green-950 text-green-200'
-                        : 'border-red-700 bg-red-950 text-red-200'
+                        ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-200'
+                        : 'border-red-300 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200'
                     }`}
                   >
                     DOC: {formData.customs_docs_received ? 'Received' : 'Not Received'}
@@ -876,8 +876,8 @@ export default function PickupsPage() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       formData.stays_in_canada
-                        ? 'border-red-600 bg-red-900 text-white'
-                        : 'border-slate-700 bg-slate-900 text-slate-300'
+                        ? 'border-red-600 bg-red-600 text-white dark:bg-red-900'
+                        : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
                     }`}
                   >
                     CAN: {formData.stays_in_canada ? 'Canada Freight' : 'Not Marked Canada'}
@@ -888,30 +888,30 @@ export default function PickupsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
                 <button
                   type="button"
                   onClick={() => setShowTimes(!showTimes)}
                   className="flex w-full items-center justify-between gap-3 text-left"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">
                       Click to add pickup/delivery times
                     </h3>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                       Add times only if there is an appointment or known time.
                     </p>
                   </div>
 
                   {showTimes ? (
-                    <ChevronUp className="h-5 w-5 text-slate-400" />
+                    <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400" />
+                    <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                   )}
                 </button>
 
                 {showTimes && (
-                  <div className="mt-5 border-t border-dark-border pt-5">
+                  <div className="mt-5 border-t border-slate-200 pt-5 dark:border-dark-border">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <DateField
                         label="Pickup Date"
@@ -982,14 +982,14 @@ export default function PickupsPage() {
 
       {loading ? (
         <div className="card">
-          <p className="text-slate-400">Loading pickups...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading pickups...</p>
         </div>
       ) : filteredShipments.length === 0 ? (
         <div className="card text-center">
-          <p className="text-slate-400">No pickups found.</p>
+          <p className="text-slate-600 dark:text-slate-400">No pickups found.</p>
         </div>
       ) : (
-        <div className="custom-board-scrollbar overflow-x-auto rounded-xl border border-dark-border">
+        <div className="custom-board-scrollbar overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
           <table className="status-table">
             <thead>
               <tr>
@@ -1022,7 +1022,7 @@ export default function PickupsPage() {
                 return (
                   <tr
                     key={shipment.id}
-                    className={selected ? 'bg-red-950/30' : ''}
+                    className={selected ? 'bg-red-50 dark:bg-red-950/30' : ''}
                   >
                     <td>
                       <input
@@ -1035,28 +1035,28 @@ export default function PickupsPage() {
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         {getBoardDisplayName(shipment)}
                       </p>
-                      <p className="mt-1 text-xs capitalize text-slate-400">
+                      <p className="mt-1 text-xs capitalize text-slate-500 dark:text-slate-400">
                         {(shipment.board_stop_type || 'pickup').replace(/_/, ' ')}
                       </p>
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         {displayValue(shipment.pickup_company_name)}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {displayLocation(shipment.pickup_address, shipment.pickup_city)}
                       </p>
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         {displayValue(shipment.delivery_company_name)}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {displayLocation(shipment.delivery_address, shipment.delivery_city)}
                       </p>
                     </td>
@@ -1106,7 +1106,7 @@ export default function PickupsPage() {
                             <button
                               type="button"
                               onClick={() => saveInlineSkidsWeight(shipment)}
-                              className="rounded bg-green-700 px-2 py-1 text-xs font-bold text-white hover:bg-green-600"
+                              className="rounded bg-green-600 px-2 py-1 text-xs font-bold text-white hover:bg-green-700"
                               disabled={inlineSavingId === shipment.id}
                             >
                               {inlineSavingId === shipment.id ? 'Saving...' : 'Save'}
@@ -1115,7 +1115,7 @@ export default function PickupsPage() {
                             <button
                               type="button"
                               onClick={closeInlineSkidsWeightEditor}
-                              className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-white hover:bg-slate-600"
+                              className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
                             >
                               Cancel
                             </button>
@@ -1125,18 +1125,18 @@ export default function PickupsPage() {
                         <button
                           type="button"
                           onClick={() => openInlineSkidsWeightEditor(shipment)}
-                          className="rounded-lg border border-transparent p-2 text-left hover:border-blue-600 hover:bg-blue-950/40"
+                          className="rounded-lg border border-transparent p-2 text-left hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-600 dark:hover:bg-blue-950/40"
                           title="Click to edit skids and weight"
                         >
-                          <p className="font-semibold text-white">
+                          <p className="font-semibold text-slate-950 dark:text-white">
                             {displayValue(shipment.number_of_skids, 'Unknown')} skids
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             {shipmentWeight
                               ? `${Number(shipmentWeight).toLocaleString()} lbs`
                               : 'Weight unknown'}
                           </p>
-                          <p className="mt-1 text-[10px] font-semibold text-blue-300">
+                          <p className="mt-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
                             Click to edit
                           </p>
                         </button>
@@ -1148,8 +1148,8 @@ export default function PickupsPage() {
                         <span
                           className={`rounded px-2 py-1 text-xs font-semibold ${
                             shipment.customs_docs_received
-                              ? 'bg-green-900 text-green-200'
-                              : 'bg-red-900 text-red-200'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           }`}
                         >
                           {shipment.customs_docs_received ? 'DOC YES' : 'DOC NO'}
@@ -1170,12 +1170,12 @@ export default function PickupsPage() {
                     </td>
 
                     <td>
-                      <p className="max-w-xs text-xs font-semibold text-yellow-300">
+                      <p className="max-w-xs text-xs font-semibold text-amber-700 dark:text-yellow-300">
                         {shipment.board_note || '—'}
                       </p>
 
                       {shipment.notes && (
-                        <p className="mt-1 max-w-xs text-xs text-slate-400">
+                        <p className="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">
                           {shipment.notes}
                         </p>
                       )}
@@ -1185,8 +1185,8 @@ export default function PickupsPage() {
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${
                           shipment.assigned_truck_id
-                            ? 'bg-blue-900 text-blue-200'
-                            : 'bg-slate-700 text-slate-300'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                         }`}
                       >
                         {shipment.assigned_truck_id ? 'On Truck' : 'Pickup Board'}
@@ -1238,7 +1238,7 @@ function FilterButtonGroup({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-500">
         {label}
       </p>
 
@@ -1248,10 +1248,10 @@ function FilterButtonGroup({
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
               value === option.value
-                ? 'border-blue-500 bg-blue-950 text-blue-100'
-                : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
+                ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-100'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
           >
             {option.label}
@@ -1277,7 +1277,7 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1290,7 +1290,7 @@ function TextField({
       />
 
       {helpText && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
           {helpText}
         </p>
       )}
@@ -1315,7 +1315,7 @@ function NumberField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1344,7 +1344,7 @@ function DateField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1369,7 +1369,7 @@ function TimeField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1385,8 +1385,8 @@ function TimeField({
 
 function CompanyPreview({ company }: { company: Company }) {
   return (
-    <div className="mt-3 rounded-lg border border-dark-border bg-slate-800 p-3 text-xs text-slate-400">
-      <p className="font-semibold text-slate-200">{company.name}</p>
+    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-dark-border dark:bg-slate-800 dark:text-slate-400">
+      <p className="font-semibold text-slate-950 dark:text-slate-200">{company.name}</p>
 
       <p className="mt-1">
         {company.address || 'No address saved'}
@@ -1641,7 +1641,7 @@ function CreatableCompanyField({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1676,7 +1676,7 @@ function CreatableCompanyField({
               onClear();
               closeMenu();
             }}
-            className="rounded-lg border border-dark-border bg-slate-800 px-3 text-sm font-semibold text-slate-200 hover:bg-slate-700"
+            className="rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Clear
           </button>
@@ -1686,7 +1686,7 @@ function CreatableCompanyField({
       {showMenu && (
         <div
           ref={listRef}
-          className="custom-board-scrollbar absolute z-[9999] mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-dark-border bg-slate-950 shadow-2xl"
+          className="custom-board-scrollbar absolute z-[9999] mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-dark-border dark:bg-slate-950"
         >
           {matchingItems.map((item, index) => (
             <button
@@ -1699,16 +1699,16 @@ function CreatableCompanyField({
                 selectCompany(item);
               }}
               onMouseEnter={() => setHighlightedIndex(index)}
-              className={`block w-full border-b border-dark-border px-4 py-3 text-left ${
+              className={`block w-full border-b border-slate-200 px-4 py-3 text-left dark:border-dark-border ${
                 highlightedIndex === index
-                  ? 'bg-blue-950 text-blue-100'
-                  : 'text-slate-200 hover:bg-slate-800'
+                  ? 'bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100'
+                  : 'text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'
               }`}
             >
-              <p className="font-semibold text-white">{item.label}</p>
+              <p className="font-semibold text-slate-950 dark:text-white">{item.label}</p>
 
               {item.description && (
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {item.description}
                 </p>
               )}
@@ -1728,8 +1728,8 @@ function CreatableCompanyField({
               disabled={creating}
               className={`block w-full px-4 py-3 text-left font-semibold disabled:opacity-60 ${
                 highlightedIndex === matchingItems.length
-                  ? 'bg-green-950 text-green-200'
-                  : 'text-green-300 hover:bg-green-950'
+                  ? 'bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200'
+                  : 'text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950'
               }`}
             >
               {creating ? 'Creating...' : `${createLabel}: ${query.trim()}`}

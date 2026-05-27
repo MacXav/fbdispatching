@@ -75,7 +75,8 @@ export default function TrucksPage() {
           );
 
           const assignedWeight = validShipments.reduce(
-            (sum, shipment) => sum + Number(shipment.weight_lbs || shipment.weight_kg || 0),
+            (sum, shipment) =>
+              sum + Number(shipment.weight_lbs || shipment.weight_kg || 0),
             0
           );
 
@@ -86,7 +87,8 @@ export default function TrucksPage() {
             capacity_skids: truck.capacity_skids || DEFAULT_SKID_CAPACITY,
             max_weight_lbs: maxWeight,
             assigned_skids: assignedSkids,
-            available_skids: (truck.capacity_skids || DEFAULT_SKID_CAPACITY) - assignedSkids,
+            available_skids:
+              (truck.capacity_skids || DEFAULT_SKID_CAPACITY) - assignedSkids,
             assigned_weight_lbs: assignedWeight,
             available_weight_lbs: maxWeight - assignedWeight,
             assigned_shipments: validShipments.length,
@@ -97,6 +99,7 @@ export default function TrucksPage() {
       setTrucksWithStats(trucksWithData);
     } catch (error) {
       console.error('Error loading trucks:', error);
+      alert('Could not load trucks.');
     } finally {
       setLoading(false);
     }
@@ -211,8 +214,8 @@ export default function TrucksPage() {
         subtitle="Manage units, rentals, drivers, skid capacity, and weight capacity"
       />
 
-      <div className="mb-6 rounded-xl border border-blue-800 bg-blue-950/60 p-4">
-        <p className="text-sm text-blue-100">
+      <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-900 dark:bg-blue-950/60 dark:shadow-none">
+        <p className="text-sm text-blue-900 dark:text-blue-100">
           Company rule: each truck maxes out at{' '}
           <span className="font-bold">12 skids</span> and{' '}
           <span className="font-bold">15,000 lbs</span>.
@@ -232,7 +235,9 @@ export default function TrucksPage() {
           <select
             className="select-field max-w-xs"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as TruckStatus | 'all')}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as TruckStatus | 'all')
+            }
           >
             <option value="all">All Status</option>
             <option value="available">Available</option>
@@ -253,15 +258,25 @@ export default function TrucksPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-dark-border bg-dark-card p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/60"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              resetForm();
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-dark-border dark:bg-dark-card"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-black text-slate-950 dark:text-white">
                   {editingId ? 'Edit Truck' : 'Add Truck / Rental'}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   Unit name and driver can change anytime.
                 </p>
               </div>
@@ -269,7 +284,8 @@ export default function TrucksPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
+                aria-label="Close form"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -277,7 +293,7 @@ export default function TrucksPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Unit / Truck Name
                 </label>
 
@@ -294,7 +310,7 @@ export default function TrucksPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Assigned Driver
                 </label>
 
@@ -310,7 +326,7 @@ export default function TrucksPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Skid Capacity
                 </label>
 
@@ -328,13 +344,13 @@ export default function TrucksPage() {
                   max={DEFAULT_SKID_CAPACITY}
                 />
 
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
                   Max allowed: {DEFAULT_SKID_CAPACITY} skids
                 </p>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Weight Capacity LBS
                 </label>
 
@@ -352,13 +368,13 @@ export default function TrucksPage() {
                   max={DEFAULT_WEIGHT_CAPACITY_LBS}
                 />
 
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
                   Max allowed: {DEFAULT_WEIGHT_CAPACITY_LBS.toLocaleString()} lbs
                 </p>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Current Route / Area
                 </label>
 
@@ -368,7 +384,10 @@ export default function TrucksPage() {
                   className="input-field"
                   value={formData.current_route_area}
                   onChange={(event) =>
-                    setFormData({ ...formData, current_route_area: event.target.value })
+                    setFormData({
+                      ...formData,
+                      current_route_area: event.target.value,
+                    })
                   }
                 />
               </div>
@@ -383,11 +402,7 @@ export default function TrucksPage() {
                   Cancel
                 </button>
 
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={saving}
-                >
+                <button type="submit" className="btn-primary" disabled={saving}>
                   {saving ? 'Saving...' : editingId ? 'Update Truck' : 'Add Truck'}
                 </button>
               </div>
@@ -398,14 +413,14 @@ export default function TrucksPage() {
 
       {loading ? (
         <div className="card">
-          <p className="text-slate-400">Loading trucks...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading trucks...</p>
         </div>
       ) : filteredTrucks.length === 0 ? (
         <div className="card text-center">
-          <p className="text-slate-400">No trucks found.</p>
+          <p className="text-slate-600 dark:text-slate-400">No trucks found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-dark-border">
+        <div className="custom-board-scrollbar overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
           <table className="status-table">
             <thead>
               <tr>
@@ -429,30 +444,34 @@ export default function TrucksPage() {
 
                 const weightPercent =
                   truck.max_weight_lbs > 0
-                    ? Math.round((truck.assigned_weight_lbs / truck.max_weight_lbs) * 100)
+                    ? Math.round(
+                        (truck.assigned_weight_lbs / truck.max_weight_lbs) * 100
+                      )
                     : 0;
 
                 return (
                   <tr key={truck.id}>
                     <td>
-                      <p className="font-semibold text-white">{truck.truck_number}</p>
+                      <p className="font-bold text-slate-950 dark:text-white">
+                        {truck.truck_number}
+                      </p>
                     </td>
 
                     <td>{truck.driver_name || 'Unassigned'}</td>
 
                     <td>
                       <div>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {truck.assigned_skids}/{truck.capacity_skids}
                         </p>
 
                         <p
-                          className={`text-xs ${
+                          className={`text-xs font-medium ${
                             truck.available_skids <= 0
-                              ? 'text-red-400'
+                              ? 'text-red-600 dark:text-red-400'
                               : truck.available_skids <= 3
-                              ? 'text-yellow-400'
-                              : 'text-green-400'
+                                ? 'text-amber-600 dark:text-yellow-400'
+                                : 'text-green-700 dark:text-green-400'
                           }`}
                         >
                           {truck.available_skids} skids left • {skidPercent}% full
@@ -462,21 +481,22 @@ export default function TrucksPage() {
 
                     <td>
                       <div>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {truck.assigned_weight_lbs.toLocaleString()}/
                           {truck.max_weight_lbs.toLocaleString()} lbs
                         </p>
 
                         <p
-                          className={`text-xs ${
+                          className={`text-xs font-medium ${
                             truck.available_weight_lbs <= 0
-                              ? 'text-red-400'
+                              ? 'text-red-600 dark:text-red-400'
                               : truck.available_weight_lbs <= 3000
-                              ? 'text-yellow-400'
-                              : 'text-green-400'
+                                ? 'text-amber-600 dark:text-yellow-400'
+                                : 'text-green-700 dark:text-green-400'
                           }`}
                         >
-                          {truck.available_weight_lbs.toLocaleString()} lbs left • {weightPercent}% full
+                          {truck.available_weight_lbs.toLocaleString()} lbs left •{' '}
+                          {weightPercent}% full
                         </p>
                       </div>
                     </td>
@@ -485,10 +505,13 @@ export default function TrucksPage() {
 
                     <td>
                       <select
-                        className="rounded border border-dark-border bg-slate-800 px-2 py-1 text-sm text-white"
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-dark-border dark:bg-slate-800 dark:text-white"
                         value={truck.status}
                         onChange={(event) =>
-                          handleStatusChange(truck.id, event.target.value as TruckStatus)
+                          handleStatusChange(
+                            truck.id,
+                            event.target.value as TruckStatus
+                          )
                         }
                       >
                         <option value="available">Available</option>
@@ -505,7 +528,7 @@ export default function TrucksPage() {
                         <button
                           type="button"
                           onClick={() => handleEdit(truck)}
-                          className="text-blue-400 hover:text-blue-300"
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                           title="Edit truck"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -514,7 +537,7 @@ export default function TrucksPage() {
                         <button
                           type="button"
                           onClick={() => handleDelete(truck.id)}
-                          className="text-red-400 hover:text-red-300"
+                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                           title="Delete truck"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -532,8 +555,8 @@ export default function TrucksPage() {
       {trucksWithStats.some(
         (truck) => truck.available_skids < 0 || truck.available_weight_lbs < 0
       ) && (
-        <div className="mt-6 rounded-xl border border-red-700 bg-red-950 p-4">
-          <p className="text-red-200">
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm dark:border-red-700 dark:bg-red-950">
+          <p className="text-red-800 dark:text-red-200">
             ⚠️ One or more trucks are over capacity. Check both skid count and total weight.
           </p>
         </div>

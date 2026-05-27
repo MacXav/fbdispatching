@@ -854,7 +854,7 @@ export default function WorkOrdersPage() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-dark-border bg-dark-card p-4 lg:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark lg:grid-cols-3">
         <FilterButtonGroup
           label="Status"
           value={statusFilter}
@@ -888,15 +888,15 @@ export default function WorkOrdersPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-dark-border bg-dark-card p-5 shadow-2xl sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/60">
+          <div className="custom-board-scrollbar max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-dark-border dark:bg-dark-card sm:p-8">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-black text-slate-950 dark:text-white">
                   {editingId ? 'Work Order Information' : 'Create Work Order'}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   {editingId
                     ? editingNumber || 'Existing work order'
                     : 'A WO number will be generated automatically after saving.'}
@@ -906,15 +906,15 @@ export default function WorkOrdersPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Customer / Billing / References
                 </h3>
 
@@ -978,8 +978,8 @@ export default function WorkOrdersPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Pickup / Delivery Information
                 </h3>
 
@@ -1034,8 +1034,8 @@ export default function WorkOrdersPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Freight / Board Information
                 </h3>
 
@@ -1107,30 +1107,30 @@ export default function WorkOrdersPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
                 <button
                   type="button"
                   onClick={() => setShowTimes(!showTimes)}
                   className="flex w-full items-center justify-between gap-3 text-left"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold text-white">
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">
                       Pickup / Delivery Dates and Times
                     </h3>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                       Add only when known or appointment-based.
                     </p>
                   </div>
 
                   {showTimes ? (
-                    <ChevronUp className="h-5 w-5 text-slate-400" />
+                    <ChevronUp className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400" />
+                    <ChevronDown className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                   )}
                 </button>
 
                 {showTimes && (
-                  <div className="mt-5 border-t border-dark-border pt-5">
+                  <div className="mt-5 border-t border-slate-200 dark:border-dark-border pt-5">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <DateField
                         label="Pickup Date"
@@ -1176,8 +1176,8 @@ export default function WorkOrdersPage() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Status / Billing
                 </h3>
 
@@ -1223,8 +1223,8 @@ export default function WorkOrdersPage() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       formData.pod_received
-                        ? 'border-green-700 bg-green-950 text-green-200'
-                        : 'border-slate-700 bg-slate-900 text-slate-300'
+                        ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-200'
+                        : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
                     }`}
                   >
                     POD: {formData.pod_received ? 'Received' : 'Not Received'}
@@ -1243,8 +1243,8 @@ export default function WorkOrdersPage() {
                     }
                     className={`rounded-lg border px-4 py-3 text-left font-semibold ${
                       formData.ready_to_invoice
-                        ? 'border-blue-700 bg-blue-950 text-blue-200'
-                        : 'border-slate-700 bg-slate-900 text-slate-300'
+                        ? 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                        : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
                     }`}
                   >
                     Invoice: {formData.ready_to_invoice ? 'Ready' : 'Not Ready'}
@@ -1267,8 +1267,8 @@ export default function WorkOrdersPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dark-border bg-slate-900/50 p-4">
-                <h3 className="mb-4 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
+                <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Notes / Special Information
                 </h3>
 
@@ -1331,14 +1331,14 @@ export default function WorkOrdersPage() {
 
       {loading ? (
         <div className="card">
-          <p className="text-slate-400">Loading work orders...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading work orders...</p>
         </div>
       ) : filteredWorkOrders.length === 0 ? (
         <div className="card text-center">
-          <p className="text-slate-400">No work orders found.</p>
+          <p className="text-slate-600 dark:text-slate-400">No work orders found.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-dark-border">
+        <div className="custom-board-scrollbar overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
           <table className="status-table">
             <thead>
               <tr>
@@ -1369,7 +1369,7 @@ export default function WorkOrdersPage() {
                         {workOrder.work_order_number}
                       </p>
 
-                      <p className="text-xs capitalize text-slate-400">
+                      <p className="text-xs capitalize text-slate-600 dark:text-slate-400">
                         {(workOrder.service_type || 'ltl').replaceAll('_', ' ')}
                       </p>
 
@@ -1388,11 +1388,11 @@ export default function WorkOrdersPage() {
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         {workOrder.customer_company_name || 'No customer'}
                       </p>
 
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         Bill To: {workOrder.bill_to_company_name || '—'}
                       </p>
 
@@ -1403,49 +1403,49 @@ export default function WorkOrdersPage() {
                       )}
 
                       {workOrder.pickup_reference && (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
                           PU Ref: {workOrder.pickup_reference}
                         </p>
                       )}
 
                       {workOrder.delivery_reference && (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
                           DEL Ref: {workOrder.delivery_reference}
                         </p>
                       )}
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         PU: {workOrder.pickup_company_name || '—'}
                       </p>
 
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         {displayLocation(workOrder.pickup_address, workOrder.pickup_city)}
                       </p>
 
-                      <p className="mt-2 font-semibold text-white">
+                      <p className="mt-2 font-semibold text-slate-950 dark:text-white">
                         DEL: {workOrder.delivery_company_name || '—'}
                       </p>
 
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         {displayLocation(workOrder.delivery_address, workOrder.delivery_city)}
                       </p>
                     </td>
 
                     <td>
-                      <p className="font-semibold text-white">
+                      <p className="font-semibold text-slate-950 dark:text-white">
                         {workOrder.number_of_skids ?? 'Unknown'} skids
                       </p>
 
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
                         {workOrder.weight_lbs
                           ? `${Number(workOrder.weight_lbs).toLocaleString()} lbs`
                           : 'Weight unknown'}
                       </p>
 
                       {workOrder.dimensions && (
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
                           {workOrder.dimensions}
                         </p>
                       )}
@@ -1453,7 +1453,7 @@ export default function WorkOrdersPage() {
 
                     <td>
                       <div className="flex flex-wrap gap-1">
-                        <span className="rounded bg-slate-700 px-2 py-1 text-xs font-semibold capitalize text-slate-200">
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                           {(workOrder.status || 'open').replaceAll('_', ' ')}
                         </span>
 
@@ -1469,7 +1469,7 @@ export default function WorkOrdersPage() {
                           </span>
                         )}
 
-                        <span className="rounded bg-slate-700 px-2 py-1 text-xs font-semibold capitalize text-slate-200">
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                           {(workOrder.invoice_status || 'not_ready').replaceAll('_', ' ')}
                         </span>
                       </div>
@@ -1478,11 +1478,11 @@ export default function WorkOrdersPage() {
                     <td>
                       {activePickup ? (
                         <div>
-                          <span className="rounded bg-green-800 px-2 py-1 text-xs font-semibold text-green-100">
+                          <span className="rounded bg-green-700 px-2 py-1 text-xs font-semibold text-white dark:bg-green-800 dark:text-green-100">
                             Pickup Created
                           </span>
 
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                             {activePickup.assigned_truck_id
                               ? 'Assigned to truck'
                               : 'On pickup board'}
@@ -1496,7 +1496,7 @@ export default function WorkOrdersPage() {
                             handleCreatePickupFromWorkOrder(workOrder);
                           }}
                           disabled={creatingPickupId === workOrder.id}
-                          className="rounded bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-600 disabled:cursor-wait disabled:opacity-60"
+                          className="rounded bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
                           title="Create pickup from this work order"
                         >
                           <PackagePlus className="mr-1 inline h-3.5 w-3.5" />
@@ -1589,8 +1589,8 @@ function FilterButtonGroup({
             onClick={() => onChange(option.value)}
             className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
               value === option.value
-                ? 'border-blue-500 bg-blue-950 text-blue-100'
-                : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
+                ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-100'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
           >
             {option.label}
@@ -1614,7 +1614,7 @@ function ButtonGroup({
 }) {
   return (
     <div>
-      <label className="mb-3 block text-sm font-medium text-slate-300">
+      <label className="mb-3 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1626,8 +1626,8 @@ function ButtonGroup({
             onClick={() => onChange(option.value)}
             className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
               value === option.value
-                ? 'border-blue-500 bg-blue-950 text-blue-100'
-                : 'border-dark-border bg-slate-900 text-slate-300 hover:bg-slate-800'
+                ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-100'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
           >
             {option.label}
@@ -1651,7 +1651,7 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1683,7 +1683,7 @@ function NumberField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1712,7 +1712,7 @@ function DateField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1737,7 +1737,7 @@ function TimeField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1764,7 +1764,7 @@ function TextAreaField({
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1781,7 +1781,7 @@ function TextAreaField({
 
 function CompanyPreview({ company }: { company: Company }) {
   return (
-    <div className="mt-3 rounded-lg border border-dark-border bg-slate-800 p-3 text-xs text-slate-400">
+    <div className="mt-3 rounded-lg border border-dark-border bg-slate-800 p-3 text-xs text-slate-600 dark:text-slate-400">
       <p className="font-semibold text-slate-200">{company.name}</p>
 
       <p className="mt-1">
@@ -1854,7 +1854,7 @@ function CreatableCompanyField({
 
   return (
     <div className="relative">
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1881,7 +1881,7 @@ function CreatableCompanyField({
               setQuery('');
               onClear();
             }}
-            className="rounded-lg border border-dark-border bg-slate-800 px-3 text-sm font-semibold text-slate-200 hover:bg-slate-700"
+            className="rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Clear
           </button>
@@ -1889,7 +1889,7 @@ function CreatableCompanyField({
       </div>
 
       {showMenu && (
-        <div className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-dark-border bg-slate-950 shadow-2xl">
+        <div className="custom-board-scrollbar absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-dark-border dark:bg-slate-950">
           {matchingItems.map((item) => (
             <button
               key={item.id}
@@ -1900,11 +1900,11 @@ function CreatableCompanyField({
                 setQuery(item.label);
                 setFocused(false);
               }}
-              className="block w-full border-b border-dark-border px-4 py-3 text-left hover:bg-slate-800"
+              className="block w-full border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50 dark:border-dark-border dark:hover:bg-slate-800"
             >
-              <p className="font-semibold text-white">{item.label}</p>
+              <p className="font-semibold text-slate-950 dark:text-white">{item.label}</p>
               {item.description && (
-                <p className="mt-1 text-xs text-slate-400">{item.description}</p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{item.description}</p>
               )}
             </button>
           ))}
@@ -1977,7 +1977,7 @@ function CreatableNameField({
 
   return (
     <div className="relative">
-      <label className="mb-2 block text-sm font-medium text-slate-300">
+      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
 
@@ -1991,7 +1991,7 @@ function CreatableNameField({
       />
 
       {showMenu && (
-        <div className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-dark-border bg-slate-950 shadow-2xl">
+        <div className="custom-board-scrollbar absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-dark-border dark:bg-slate-950">
           {matchingItems.map((item) => (
             <button
               key={item.id}
@@ -2001,11 +2001,11 @@ function CreatableNameField({
                 onChange(item.label);
                 setFocused(false);
               }}
-              className="block w-full border-b border-dark-border px-4 py-3 text-left hover:bg-slate-800"
+              className="block w-full border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50 dark:border-dark-border dark:hover:bg-slate-800"
             >
-              <p className="font-semibold text-white">{item.label}</p>
+              <p className="font-semibold text-slate-950 dark:text-white">{item.label}</p>
               {item.description && (
-                <p className="mt-1 text-xs text-slate-400">{item.description}</p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{item.description}</p>
               )}
             </button>
           ))}

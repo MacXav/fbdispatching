@@ -277,8 +277,8 @@ export default function BolsPage() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-xl border border-blue-900 bg-blue-950/50 p-4">
-          <p className="text-sm text-blue-100">
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-900 dark:bg-blue-950/50 dark:shadow-none">
+          <p className="text-sm leading-6 text-blue-900 dark:text-blue-100">
             Every time you click Save Work Order Document + Print, the selected
             work order document is saved into Work Order History as a snapshot.
             That means you can look it up later even if the shipment details change.
@@ -287,7 +287,7 @@ export default function BolsPage() {
 
         <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-[1fr_260px]">
           <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
 
             <input
               type="text"
@@ -314,7 +314,7 @@ export default function BolsPage() {
               setSelectedShipmentIds([]);
               setSavedPrintRecords([]);
             }}
-            className="mb-4 text-sm font-semibold text-red-300 hover:text-red-200"
+            className="mb-4 text-sm font-semibold text-red-600 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
           >
             Clear selection
           </button>
@@ -322,14 +322,18 @@ export default function BolsPage() {
 
         {loading ? (
           <div className="card">
-            <p className="text-slate-400">Loading work orders...</p>
+            <p className="text-slate-600 dark:text-slate-400">
+              Loading work orders...
+            </p>
           </div>
         ) : filteredShipments.length === 0 ? (
           <div className="card text-center">
-            <p className="text-slate-400">No work orders found.</p>
+            <p className="text-slate-600 dark:text-slate-400">
+              No work orders found.
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-dark-border">
+          <div className="custom-board-scrollbar overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
             <table className="status-table">
               <thead>
                 <tr>
@@ -355,7 +359,10 @@ export default function BolsPage() {
                   const selected = selectedShipmentIds.includes(shipment.id);
 
                   return (
-                    <tr key={shipment.id} className={selected ? 'bg-blue-950/40' : ''}>
+                    <tr
+                      key={shipment.id}
+                      className={selected ? 'bg-blue-50 dark:bg-blue-950/40' : ''}
+                    >
                       <td>
                         <input
                           type="checkbox"
@@ -366,19 +373,19 @@ export default function BolsPage() {
                       </td>
 
                       <td>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {getDraftBolNumber(shipment)}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           New number made when saved
                         </p>
                       </td>
 
                       <td>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {displayValue(shipment.pickup_company_name)}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           {displayLocation(
                             shipment.pickup_address,
                             shipment.pickup_city,
@@ -388,10 +395,10 @@ export default function BolsPage() {
                       </td>
 
                       <td>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {displayValue(shipment.delivery_company_name)}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           {displayLocation(
                             shipment.delivery_address,
                             shipment.delivery_city,
@@ -401,16 +408,16 @@ export default function BolsPage() {
                       </td>
 
                       <td>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-950 dark:text-white">
                           {displayValue(shipment.number_of_skids, 'Unknown')} skid(s)
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           {getShipmentWeight(shipment) || 'Weight unknown'}
                         </p>
                       </td>
 
                       <td>
-                        <p className="max-w-xs text-xs font-semibold text-yellow-300">
+                        <p className="max-w-xs text-xs font-semibold text-amber-700 dark:text-yellow-300">
                           {shipment.board_note || shipment.notes || '—'}
                         </p>
                       </td>
@@ -423,10 +430,10 @@ export default function BolsPage() {
         )}
 
         {selectedShipments.length > 0 && (
-          <div className="mt-8 rounded-xl border border-dark-border bg-dark-card p-5">
+          <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
             <div className="mb-4 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-300" />
-              <h2 className="text-xl font-bold text-white">
+              <FileText className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+              <h2 className="text-xl font-black text-slate-950 dark:text-white">
                 Work Order Document Preview
               </h2>
             </div>
@@ -440,7 +447,7 @@ export default function BolsPage() {
                 return (
                   <div
                     key={shipment.id}
-                    className="rounded-xl border border-slate-700 bg-white p-4 text-black"
+                    className="rounded-2xl border border-slate-300 bg-white p-4 text-black shadow-sm dark:border-slate-700"
                   >
                     <PrintableBol
                       shipment={shipment}

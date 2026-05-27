@@ -235,9 +235,9 @@ export default function RoutesPage() {
       <MainLayout>
         <Header title="Routes" subtitle="View active truck routes" />
 
-        <div className="rounded-2xl border border-dark-border bg-dark-card py-12 text-center">
-          <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-300" />
-          <p className="text-slate-400">Loading routes...</p>
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark py-12 text-center">
+          <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-700 dark:text-blue-300" />
+          <p className="text-slate-700 dark:text-slate-300">Loading routes...</p>
         </div>
       </MainLayout>
     );
@@ -250,14 +250,14 @@ export default function RoutesPage() {
         subtitle="View active route stops, Google route estimates, and assigned freight by truck"
       />
 
-      <div className="mb-6 rounded-2xl border border-dark-border bg-dark-card p-5">
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark p-5">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-xl font-black text-white">
+            <h2 className="text-xl font-black text-slate-950 dark:text-white">
               Active truck routes
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
               Every Google route starts from 146 Cushman Road, St. Catharines. Google tests the best delivery ending point and optimizes the middle stops.
             </p>
           </div>
@@ -282,18 +282,18 @@ export default function RoutesPage() {
       </div>
 
       {routes.length === 0 ? (
-        <div className="rounded-2xl border border-dark-border bg-dark-card py-12 text-center">
-          <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-500" />
-          <p className="font-semibold text-white">No active routes yet.</p>
-          <p className="mt-1 text-sm text-slate-400">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark py-12 text-center">
+          <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-700 dark:text-slate-400" />
+          <p className="font-semibold text-slate-950 dark:text-white">No active routes yet.</p>
+          <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             Assign pickups or type route notes on the truck board.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="h-fit rounded-2xl border border-dark-border bg-dark-card p-5 lg:col-span-1">
-            <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white">
-              <TruckIcon className="h-5 w-5 text-blue-400" />
+          <div className="h-fit rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark p-5 lg:col-span-1">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950 dark:text-white">
+              <TruckIcon className="h-5 w-5 text-blue-700 dark:text-blue-400" />
               Trucks
             </h3>
 
@@ -310,16 +310,20 @@ export default function RoutesPage() {
                     className={`w-full rounded-xl border p-3 text-left transition-colors ${
                       selected
                         ? 'border-blue-500 bg-blue-600'
-                        : 'border-dark-border bg-slate-900 hover:bg-slate-800'
+                        : 'border-slate-200 bg-white dark:border-dark-border dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-lg font-black text-white">
+                        <p
+                          className={`truncate text-lg font-black ${
+                            selected ? 'text-white' : 'text-slate-950 dark:text-white'
+                          }`}
+                        >
                           {displayValue(route.truck.truck_number)}
                         </p>
 
-                        <p className={`mt-1 truncate text-xs ${selected ? 'text-blue-100' : 'text-slate-400'}`}>
+                        <p className={`mt-1 truncate text-xs ${selected ? 'text-blue-900 dark:text-blue-100' : 'text-slate-700 dark:text-slate-300'}`}>
                           {displayValue(route.truck.driver_name, 'No driver')}
                         </p>
                       </div>
@@ -331,16 +335,16 @@ export default function RoutesPage() {
                       )}
                     </div>
 
-                    <p className={`mt-2 text-xs ${selected ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <p className={`mt-2 text-xs ${selected ? 'text-white' : 'text-slate-700 dark:text-slate-400'}`}>
                       {route.totalStops} stop(s) • {route.totalSkids} skid(s)
                     </p>
 
-                    <p className={`mt-1 text-xs ${selected ? 'text-blue-100' : 'text-slate-500'}`}>
+                    <p className={`mt-1 text-xs ${selected ? 'text-white' : 'text-slate-700 dark:text-slate-400'}`}>
                       GPS: {route.gpsReadyShipments.length}/{route.totalFreightStops}
                     </p>
 
                     {routeEstimate && (
-                      <p className={`mt-1 text-xs font-semibold ${selected ? 'text-blue-100' : 'text-green-300'}`}>
+                      <p className={`mt-1 text-xs font-semibold ${selected ? 'text-white' : 'text-green-700 dark:text-green-300'}`}>
                         Google: {routeEstimate.durationText} • {routeEstimate.distanceText}
                       </p>
                     )}
@@ -352,8 +356,8 @@ export default function RoutesPage() {
 
           <div className="lg:col-span-3">
             {!selectedRoute ? (
-              <div className="rounded-2xl border border-dark-border bg-dark-card py-12 text-center">
-                <p className="text-slate-400">Select a truck to view its route.</p>
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark py-12 text-center">
+                <p className="text-slate-700 dark:text-slate-300">Select a truck to view its route.</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -407,14 +411,14 @@ function RouteHeaderCard({
     route.gpsReadyShipments.length > 26;
 
   return (
-    <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark p-5">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-3xl font-black text-white">
+          <h2 className="text-3xl font-black text-slate-950 dark:text-white">
             {displayValue(route.truck.truck_number)}
           </h2>
 
-          <p className="mt-1 text-slate-400">
+          <p className="mt-1 text-slate-700 dark:text-slate-300">
             Driver: {displayValue(route.truck.driver_name, 'No driver assigned')}
           </p>
         </div>
@@ -435,13 +439,13 @@ function RouteHeaderCard({
           </button>
 
           {route.gpsReadyShipments.length < 1 && (
-            <p className="text-xs text-yellow-300">
+            <p className="text-xs text-amber-700 dark:text-yellow-300">
               Needs at least 1 GPS-ready freight stop.
             </p>
           )}
 
           {route.gpsReadyShipments.length > 26 && (
-            <p className="text-xs text-yellow-300">
+            <p className="text-xs text-amber-700 dark:text-yellow-300">
               Too many GPS stops. Max is 26.
             </p>
           )}
@@ -495,15 +499,15 @@ function GoogleRouteResultCard({
   const googleMapsUrl = buildGoogleMapsDirectionsUrl(googleRoute.orderedStops);
 
   return (
-    <div className="rounded-2xl border border-blue-900 bg-blue-950/20 p-5">
+    <div className="rounded-2xl border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20 p-5">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="flex items-center gap-2 text-xl font-black text-white">
-            <Route className="h-5 w-5 text-blue-300" />
+          <h3 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white">
+            <Route className="h-5 w-5 text-blue-700 dark:text-blue-300" />
             Google route estimate
           </h3>
 
-          <p className="mt-1 text-sm text-blue-100/70">
+          <p className="mt-1 text-sm text-blue-900 dark:text-blue-800 dark:text-blue-200">
             This route starts at {googleRoute.originAddress || '146 Cushman Road, St. Catharines'}. Google tests the best final delivery and optimizes the middle stops for the fastest route.
           </p>
         </div>
@@ -527,22 +531,22 @@ function GoogleRouteResultCard({
         <GoogleStat label="Delivery Stops" value={String(googleRoute.orderedStops.length)} />
       </div>
 
-      <div className="rounded-2xl border border-dark-border bg-slate-950 p-4">
-        <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-slate-500">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950 p-4">
+        <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
           Optimized stop order from home office
         </h4>
 
-        <div className="mb-2 flex items-start gap-3 rounded-xl border border-blue-900 bg-blue-950/30 p-3">
-          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-800 text-xs font-black text-blue-100">
+        <div className="mb-2 flex items-start gap-3 rounded-xl border border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-3">
+          <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
             0
           </span>
 
           <div className="min-w-0 flex-1">
-            <span className="rounded bg-blue-900 px-2 py-1 text-[10px] font-black text-blue-100">
+            <span className="rounded bg-blue-100 dark:bg-blue-900 px-2 py-1 text-[10px] font-black text-blue-900 dark:text-blue-100">
               START
             </span>
 
-            <p className="mt-2 truncate text-sm font-black text-white">
+            <p className="mt-2 truncate text-sm font-black text-slate-950 dark:text-white">
               {googleRoute.originAddress || '146 Cushman Road, St. Catharines, ON, Canada'}
             </p>
           </div>
@@ -557,9 +561,9 @@ function GoogleRouteResultCard({
             return (
               <div
                 key={`${stop.shipmentId}-${index}`}
-                className="flex items-start gap-3 rounded-xl border border-dark-border bg-slate-900 p-3"
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white dark:border-dark-border dark:bg-slate-900 p-3"
               >
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-900 text-xs font-black text-blue-100">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-black text-blue-900 dark:bg-blue-900 dark:text-blue-100">
                   {index + 1}
                 </span>
 
@@ -572,12 +576,12 @@ function GoogleRouteResultCard({
                     )}
                   </div>
 
-                  <p className="truncate text-sm font-black text-white">
+                  <p className="truncate text-sm font-black text-slate-950 dark:text-white">
                     {stop.label}
                   </p>
 
                   {matchingShipment && (
-                    <p className="mt-1 truncate text-xs text-slate-400">
+                    <p className="mt-1 truncate text-xs text-slate-700 dark:text-slate-300">
                       {displayLocation(matchingShipment.delivery_address, matchingShipment.delivery_city)}
                     </p>
                   )}
@@ -593,21 +597,21 @@ function GoogleRouteResultCard({
 
 function RouteWarningCard({ route }: { route: TruckRoute }) {
   return (
-    <details className="rounded-2xl border border-yellow-900 bg-yellow-950/30 p-5">
+    <details className="rounded-2xl border border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/30 p-5">
       <summary className="cursor-pointer list-none">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="flex items-center gap-2 text-lg font-black text-yellow-100">
+            <h3 className="flex items-center gap-2 text-lg font-black text-yellow-900 dark:text-yellow-100">
               <AlertTriangle className="h-5 w-5" />
               Route warnings
             </h3>
 
-            <p className="mt-1 text-sm text-yellow-100/70">
+            <p className="mt-1 text-sm text-yellow-900 dark:text-yellow-800 dark:text-yellow-800 dark:text-yellow-200">
               {route.missingGpsShipments.length} freight stop(s) missing GPS • {route.routeNoteShipments.length} route note(s)
             </p>
           </div>
 
-          <span className="rounded-full border border-yellow-800 bg-yellow-900/40 px-3 py-1 text-xs font-black text-yellow-100">
+          <span className="rounded-full border border-yellow-800 bg-yellow-100 dark:bg-yellow-900/40 px-3 py-1 text-xs font-black text-yellow-900 dark:text-yellow-100">
             Show details
           </span>
         </div>
@@ -615,8 +619,8 @@ function RouteWarningCard({ route }: { route: TruckRoute }) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {route.missingGpsShipments.length > 0 && (
-          <div className="rounded-xl border border-yellow-900 bg-black/20 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-yellow-100">
+          <div className="rounded-xl border border-yellow-900 bg-white/70 dark:bg-black/20 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-yellow-900 dark:text-yellow-100">
               Missing delivery GPS
             </p>
 
@@ -624,13 +628,13 @@ function RouteWarningCard({ route }: { route: TruckRoute }) {
               {route.missingGpsShipments.map((shipment) => (
                 <div
                   key={shipment.id}
-                  className="rounded-lg border border-yellow-900/70 bg-black/30 p-3"
+                  className="rounded-lg border border-yellow-900/70 bg-white dark:bg-black/30 p-3"
                 >
-                  <p className="font-semibold text-yellow-100">
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-100">
                     {displayValue(getBoardDisplayName(shipment), 'Freight stop')}
                   </p>
 
-                  <p className="mt-1 text-xs text-yellow-100/70">
+                  <p className="mt-1 text-xs text-yellow-900 dark:text-yellow-800 dark:text-yellow-800 dark:text-yellow-200">
                     {displayLocation(shipment.delivery_address, shipment.delivery_city)}
                   </p>
                 </div>
@@ -640,8 +644,8 @@ function RouteWarningCard({ route }: { route: TruckRoute }) {
         )}
 
         {route.routeNoteShipments.length > 0 && (
-          <div className="rounded-xl border border-blue-900 bg-black/20 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-blue-100">
+          <div className="rounded-xl border border-blue-900 bg-white/70 dark:bg-black/20 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-blue-900 dark:text-blue-100">
               Route notes
             </p>
 
@@ -649,14 +653,14 @@ function RouteWarningCard({ route }: { route: TruckRoute }) {
               {route.routeNoteShipments.map((shipment) => (
                 <div
                   key={shipment.id}
-                  className="rounded-lg border border-blue-900/70 bg-black/30 p-3"
+                  className="rounded-lg border border-blue-900/70 bg-white dark:bg-black/30 p-3"
                 >
-                  <p className="font-semibold text-blue-100">
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">
                     {displayValue(shipment.board_name, 'Route note')}
                   </p>
 
                   {shipment.board_note && (
-                    <p className="mt-1 text-xs text-blue-100/70">
+                    <p className="mt-1 text-xs text-blue-900 dark:text-blue-800 dark:text-blue-200">
                       {shipment.board_note}
                     </p>
                   )}
@@ -688,9 +692,9 @@ function RouteStopsCard({
   }
 
   return (
-    <div className="rounded-2xl border border-dark-border bg-dark-card p-5">
-      <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-white">
-        <Navigation2 className="h-5 w-5 text-blue-400" />
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark p-5">
+      <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-slate-950 dark:text-white">
+        <Navigation2 className="h-5 w-5 text-blue-700 dark:text-blue-400" />
         Route stops
       </h3>
 
@@ -706,12 +710,12 @@ function RouteStopsCard({
               key={shipment.id}
               className={`rounded-xl border p-4 ${
                 shipment.route_completed
-                  ? 'border-green-800 bg-green-950/50'
+                  ? 'border-green-800 bg-green-50 dark:bg-green-950/50'
                   : isBoardOnlyStop
                     ? 'border-slate-700 bg-slate-900'
                     : shipment.stays_in_canada
-                      ? 'border-red-800 bg-red-950/50'
-                      : 'border-dark-border bg-slate-800'
+                      ? 'border-red-800 bg-red-50 dark:bg-red-950/50'
+                      : 'border-slate-200 bg-white dark:border-dark-border dark:bg-slate-800'
               }`}
             >
               <div className="flex items-start gap-4">
@@ -720,11 +724,11 @@ function RouteStopsCard({
                     shipment.route_completed
                       ? 'bg-green-700'
                       : isBoardOnlyStop
-                        ? 'bg-slate-700'
+                        ? 'bg-slate-100 dark:bg-slate-700'
                         : 'bg-blue-600'
                   }`}
                 >
-                  <span className="text-sm font-black text-white">
+                  <span className="text-sm font-black text-slate-950 dark:text-white">
                     {index + 1}
                   </span>
                 </div>
@@ -732,26 +736,26 @@ function RouteStopsCard({
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     {shipment.route_completed && (
-                      <span className="flex items-center gap-1 rounded bg-green-700 px-2 py-1 text-xs font-semibold text-white">
+                      <span className="flex items-center gap-1 rounded bg-green-700 px-2 py-1 text-xs font-semibold text-slate-950 dark:text-white">
                         <CheckCircle2 className="h-3 w-3" />
                         FIN
                       </span>
                     )}
 
                     {isBoardOnlyStop && (
-                      <span className="rounded bg-slate-700 px-2 py-1 text-xs font-semibold text-white">
+                      <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-white">
                         ROUTE NOTE
                       </span>
                     )}
 
                     {!isBoardOnlyStop && shipment.stays_in_canada && (
-                      <span className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white">
+                      <span className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-slate-950 dark:text-white">
                         CANADA
                       </span>
                     )}
 
                     {!isBoardOnlyStop && (
-                      <span className="rounded bg-slate-700 px-2 py-1 text-xs font-semibold text-slate-200">
+                      <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                         {getStopTypeLabel(shipment.board_stop_type)}
                       </span>
                     )}
@@ -763,19 +767,19 @@ function RouteStopsCard({
                     )}
 
                     {!isBoardOnlyStop && locationSource && (
-                      <span className="rounded bg-green-800 px-2 py-1 text-xs font-semibold text-green-100">
+                      <span className="rounded bg-green-800 px-2 py-1 text-xs font-semibold text-green-900 dark:text-green-100">
                         GPS {locationSource.source === 'company' ? 'COMPANY' : 'SHIPMENT'}
                       </span>
                     )}
 
                     {!isBoardOnlyStop && !locationSource && (
-                      <span className="rounded bg-yellow-800 px-2 py-1 text-xs font-semibold text-yellow-100">
+                      <span className="rounded bg-yellow-800 px-2 py-1 text-xs font-semibold text-yellow-900 dark:text-yellow-100">
                         NO GPS
                       </span>
                     )}
 
                     {googleOrder && (
-                      <span className="rounded bg-blue-800 px-2 py-1 text-xs font-semibold text-blue-100">
+                      <span className="rounded bg-blue-800 px-2 py-1 text-xs font-semibold text-blue-900 dark:text-blue-100">
                         Google #{googleOrder}
                       </span>
                     )}
@@ -804,12 +808,12 @@ function TopStat({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-950 px-4 py-3">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950 px-4 py-3">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
         {label}
       </p>
 
-      <p className="mt-1 text-2xl font-black text-white">
+      <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>
@@ -824,12 +828,12 @@ function RouteStat({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-slate-950 p-4">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950 p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
         {label}
       </p>
 
-      <p className="mt-1 text-xl font-black text-white">
+      <p className="mt-1 text-xl font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>
@@ -846,10 +850,10 @@ function SmallInfoBox({
   tone: 'green' | 'yellow' | 'blue' | 'slate';
 }) {
   const toneClasses = {
-    green: 'border-green-900 bg-green-950/30 text-green-100',
-    yellow: 'border-yellow-900 bg-yellow-950/30 text-yellow-100',
-    blue: 'border-blue-900 bg-blue-950/30 text-blue-100',
-    slate: 'border-dark-border bg-slate-950 text-slate-200',
+    green: 'border-green-900 bg-green-50 dark:bg-green-950/30 text-green-900 dark:text-green-100',
+    yellow: 'border-yellow-300 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950/30 text-yellow-900 dark:text-yellow-100',
+    blue: 'border-blue-900 bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100',
+    slate: 'border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950 text-slate-200',
   };
 
   return (
@@ -858,7 +862,7 @@ function SmallInfoBox({
         {label}
       </p>
 
-      <p className="mt-1 text-lg font-black text-white">
+      <p className="mt-1 text-lg font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>
@@ -873,12 +877,12 @@ function GoogleStat({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-blue-900 bg-slate-950 p-4">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+    <div className="rounded-xl border border-blue-200 bg-white dark:border-blue-900 dark:bg-slate-950 p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
         {label}
       </p>
 
-      <p className="mt-1 text-2xl font-black text-white">
+      <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
         {value}
       </p>
     </div>
@@ -888,18 +892,18 @@ function GoogleStat({
 function RouteNoteStop({ shipment }: { shipment: Shipment }) {
   return (
     <div>
-      <p className="text-lg font-bold text-white">
+      <p className="text-lg font-bold text-slate-950 dark:text-white">
         {displayValue(shipment.board_name, 'Route note')}
       </p>
 
       {shipment.board_note && (
-        <p className="mt-2 rounded border border-yellow-800/70 bg-yellow-950/40 px-3 py-2 text-sm font-semibold text-yellow-200">
+        <p className="mt-2 rounded border border-yellow-800/70 bg-yellow-50 dark:bg-yellow-950/40 px-3 py-2 text-sm font-semibold text-yellow-800 dark:text-yellow-200">
           {shipment.board_note}
         </p>
       )}
 
       {shipment.route_completed && (
-        <p className="mt-2 text-xs text-green-300">
+        <p className="mt-2 text-xs text-green-700 dark:text-green-300">
           Completed by {displayValue(shipment.route_completed_by, 'driver')}
         </p>
       )}
@@ -912,52 +916,52 @@ function FreightStop({ shipment }: { shipment: Shipment }) {
 
   return (
     <div>
-      <p className="font-semibold text-white">
+      <p className="font-semibold text-slate-950 dark:text-white">
         {displayValue(getBoardDisplayName(shipment), 'Freight stop')}
       </p>
 
       {shipment.work_order_number && (
-        <p className="mt-1 text-xs font-semibold text-blue-300">
+        <p className="mt-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
           {shipment.work_order_number}
         </p>
       )}
 
       <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-dark-border bg-slate-950/60 p-3">
-          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950/60 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
             Pickup
           </p>
 
-          <p className="mt-1 font-semibold text-white">
+          <p className="mt-1 font-semibold text-slate-950 dark:text-white">
             {displayValue(shipment.pickup_company_name)}
           </p>
 
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
             {displayLocation(shipment.pickup_address, shipment.pickup_city)}
           </p>
 
           {(shipment.pickup_date || shipment.pickup_time) && (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-400">
               {displayDateTime(shipment.pickup_date, shipment.pickup_time)}
             </p>
           )}
         </div>
 
-        <div className="rounded-lg border border-dark-border bg-slate-950/60 p-3">
-          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950/60 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
             Delivery
           </p>
 
-          <p className="mt-1 font-semibold text-white">
+          <p className="mt-1 font-semibold text-slate-950 dark:text-white">
             {displayValue(shipment.delivery_company_name)}
           </p>
 
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-700 dark:text-slate-300">
             {displayLocation(shipment.delivery_address, shipment.delivery_city)}
           </p>
 
           {(shipment.delivery_date || shipment.delivery_time) && (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-400">
               {displayDateTime(shipment.delivery_date, shipment.delivery_time)}
             </p>
           )}
@@ -965,41 +969,41 @@ function FreightStop({ shipment }: { shipment: Shipment }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <span className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-200">
+        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
           {displayValue(shipment.number_of_skids, 'Unknown')} skids
         </span>
 
-        <span className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-200">
+        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
           {shipmentWeight
             ? `${Number(shipmentWeight).toLocaleString()} lbs`
             : 'Weight unknown'}
         </span>
 
         {shipment.customs_docs_received ? (
-          <span className="rounded bg-green-800 px-2 py-1 text-xs text-green-100">
+          <span className="rounded bg-green-800 px-2 py-1 text-xs text-green-900 dark:text-green-100">
             DOC YES
           </span>
         ) : (
-          <span className="rounded bg-red-900 px-2 py-1 text-xs text-red-100">
+          <span className="rounded bg-red-100 dark:bg-red-900 px-2 py-1 text-xs text-red-900 dark:text-red-100">
             DOC NO
           </span>
         )}
       </div>
 
       {shipment.board_note && (
-        <p className="mt-3 rounded border border-yellow-800/70 bg-yellow-950/40 px-3 py-2 text-sm font-semibold text-yellow-200">
+        <p className="mt-3 rounded border border-yellow-800/70 bg-yellow-50 dark:bg-yellow-950/40 px-3 py-2 text-sm font-semibold text-yellow-800 dark:text-yellow-200">
           {shipment.board_note}
         </p>
       )}
 
       {shipment.notes && (
-        <p className="mt-2 text-sm italic text-slate-400">
+        <p className="mt-2 text-sm italic text-slate-700 dark:text-slate-300">
           Note: {shipment.notes}
         </p>
       )}
 
       {shipment.route_completed && (
-        <p className="mt-2 text-xs text-green-300">
+        <p className="mt-2 text-xs text-green-700 dark:text-green-300">
           Completed by {displayValue(shipment.route_completed_by, 'driver')}
         </p>
       )}
@@ -1012,7 +1016,7 @@ function buildGoogleStopsForRoute(
   companies: Company[]
 ): GoogleRouteStop[] {
   return route.gpsReadyShipments
-    .map((shipment) => {
+    .map((shipment): GoogleRouteStop | null => {
       const locationSource = getShipmentLocationSource(shipment, companies);
 
       if (!locationSource) {
@@ -1032,7 +1036,7 @@ function buildGoogleStopsForRoute(
         city: shipment.delivery_city,
       };
     })
-    .filter((stop): stop is GoogleRouteStop => Boolean(stop));
+    .filter((stop): stop is GoogleRouteStop => stop !== null);
 }
 
 function getRouteBucket(shipment: Shipment) {

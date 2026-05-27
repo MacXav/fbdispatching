@@ -194,7 +194,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           : desktopCollapsed
             ? 'min-h-screen w-[72px]'
             : 'min-h-screen w-64'
-      } flex flex-col border-r border-dark-border bg-dark-card transition-all duration-300`}
+      } flex flex-col border-r border-slate-200 bg-white text-slate-950 shadow-sm transition-all duration-300 dark:border-dark-border dark:bg-dark-card dark:text-slate-100 dark:shadow-none`}
     >
       <div
         className={`flex min-h-0 flex-1 flex-col ${
@@ -214,16 +214,17 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
               }`}
               title="Dispatch Pro"
             >
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-950 text-blue-300 shadow-lg shadow-blue-950/30">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700 shadow-sm dark:border-blue-500/30 dark:bg-blue-950 dark:text-blue-300 dark:shadow-blue-950/30">
                 <Truck className="h-5 w-5" />
               </div>
 
               {!desktopCollapsed && (
                 <div className="min-w-0">
-                  <h1 className="truncate text-base font-black leading-tight text-white">
+                  <h1 className="truncate text-base font-black leading-tight text-slate-950 dark:text-white">
                     Dispatch Pro
                   </h1>
-                  <p className="truncate text-[11px] font-semibold text-slate-500">
+
+                  <p className="truncate text-[11px] font-semibold text-slate-500 dark:text-slate-500">
                     Trucking Management
                   </p>
                 </div>
@@ -234,7 +235,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
               <button
                 type="button"
                 onClick={toggleCollapsed}
-                className="rounded-xl border border-dark-border bg-slate-900 p-2 text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+                className="rounded-xl border border-slate-300 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-dark-border dark:bg-slate-900 dark:text-slate-400 dark:shadow-none dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
                 title="Collapse sidebar"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -247,7 +248,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="mb-5 flex h-10 w-full items-center justify-center rounded-xl border border-dark-border bg-slate-900 text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+            className="mb-5 flex h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-dark-border dark:bg-slate-900 dark:text-slate-400 dark:shadow-none dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
             title="Expand sidebar"
           >
             <ChevronRight className="h-4 w-4" />
@@ -256,15 +257,16 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
 
         {mobile && (
           <div className="mb-5 flex items-center gap-3 px-1">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-950 text-blue-300">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-950 dark:text-blue-300">
               <Menu className="h-5 w-5" />
             </div>
 
             <div>
-              <h1 className="text-base font-black leading-tight text-white">
+              <h1 className="text-base font-black leading-tight text-slate-950 dark:text-white">
                 Dispatch Pro
               </h1>
-              <p className="text-[11px] font-semibold text-slate-500">
+
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-500">
                 Navigation
               </p>
             </div>
@@ -275,13 +277,13 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           {groups.map((group, groupIndex) => (
             <div key={group.title || `group-${groupIndex}`}>
               {group.title && !desktopCollapsed && (
-                <p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">
+                <p className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-600">
                   {group.title}
                 </p>
               )}
 
               {group.title && desktopCollapsed && groupIndex > 0 && (
-                <div className="mx-auto mb-2 h-px w-8 bg-dark-border" />
+                <div className="mx-auto mb-2 h-px w-8 bg-slate-200 dark:bg-dark-border" />
               )}
 
               <div className="space-y-1">
@@ -301,8 +303,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                           : 'gap-3 px-3 py-2.5'
                       } ${
                         active
-                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
                       }`}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
@@ -314,7 +316,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                       )}
 
                       {desktopCollapsed && (
-                        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-dark-border bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-xl group-hover:block">
+                        <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-xl group-hover:block dark:border-dark-border dark:bg-slate-950 dark:text-white">
                           {link.label}
                         </span>
                       )}
@@ -327,7 +329,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         </nav>
 
         <div
-          className={`mt-5 border-t border-dark-border pt-4 ${
+          className={`mt-5 border-t border-slate-200 pt-4 dark:border-dark-border ${
             desktopCollapsed ? 'text-center' : ''
           }`}
         >
@@ -335,7 +337,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-dark-border bg-slate-900 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-dark-border dark:bg-slate-900 dark:text-slate-400 dark:shadow-none dark:hover:bg-slate-800 dark:hover:text-white"
               title="Expand sidebar"
             >
               <ChevronRight className="h-4 w-4" />
@@ -346,7 +348,8 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                 <p className="text-xs font-semibold text-slate-500">
                   © 2026 Dispatch Pro
                 </p>
-                <p className="mt-0.5 text-[10px] text-slate-600">
+
+                <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-600">
                   Local dispatch system
                 </p>
               </div>
@@ -355,7 +358,7 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
                 <button
                   type="button"
                   onClick={toggleCollapsed}
-                  className="rounded-xl border border-dark-border bg-slate-900 p-2 text-slate-400 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+                  className="rounded-xl border border-slate-300 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-dark-border dark:bg-slate-900 dark:text-slate-400 dark:shadow-none dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
                   title="Collapse sidebar"
                 >
                   <ChevronLeft className="h-4 w-4" />
