@@ -116,6 +116,7 @@ const stopTypeOptions: { value: BoardStopType; label: string }[] = [
 ];
 
 export default function WorkOrdersPage() {
+
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -126,7 +127,7 @@ export default function WorkOrdersPage() {
   const [creatingPickupId, setCreatingPickupId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
-  const [showTimes, setShowTimes] = useState(false);
+  const [showTimes, setShowTimes] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNumber, setEditingNumber] = useState<string | null>(null);
 
@@ -143,8 +144,34 @@ export default function WorkOrdersPage() {
 
   const [formData, setFormData] = useState(emptyForm);
 
+  const openWorkOrderDetail = (workOrder: WorkOrder) => {
+    const href = getWorkOrderDetailHref(workOrder);
+    window.open(href, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     loadPageData();
+  }, []);
+
+  useEffect(() => {
+    const refreshWorkOrders = () => {
+      loadPageData();
+    };
+
+    const handleStorageRefresh = (event: StorageEvent) => {
+      if (event.key === 'dispatch_pro_work_orders_refresh') {
+        loadPageData();
+      }
+    };
+
+    window.addEventListener('focus', refreshWorkOrders);
+    window.addEventListener('storage', handleStorageRefresh);
+
+    return () => {
+      window.removeEventListener('focus', refreshWorkOrders);
+      window.removeEventListener('storage', handleStorageRefresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPageData = async () => {
@@ -448,7 +475,7 @@ export default function WorkOrdersPage() {
         postal_code: null,
         contact_name: null,
         contact_phone: null,
-        notes: 'Created from work order form. Address/details need to be completed later.',
+        notes: null,
         is_shipper: field === 'pickup',
       } as Omit<Company, 'id' | 'created_at' | 'updated_at'>);
 
@@ -584,6 +611,23 @@ export default function WorkOrdersPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    if (!formData.pickup_date || !formData.delivery_date) {
+      setShowTimes(true);
+      alert('Pickup Date and Estimated Delivery Date are required before saving a work order.');
+      return;
+    }
+
+    if (formData.delivery_date < formData.pickup_date) {
+      const shouldContinue = confirm(
+        'The estimated delivery date is before the pickup date. Do you still want to save this work order?'
+      );
+
+      if (!shouldContinue) {
+        setShowTimes(true);
+        return;
+      }
+    }
 
     try {
       setSaving(true);
@@ -773,7 +817,7 @@ export default function WorkOrdersPage() {
       status: (workOrder.status as WorkOrderStatus) || 'open',
     });
 
-    setShowTimes(hasTimes);
+    setShowTimes(true);
     setEditingId(workOrder.id);
     setEditingNumber(workOrder.work_order_number);
     setShowForm(true);
@@ -809,7 +853,7 @@ export default function WorkOrdersPage() {
 
   const resetForm = () => {
     setFormData(emptyForm);
-    setShowTimes(false);
+    setShowTimes(true);
     setEditingId(null);
     setEditingNumber(null);
     setShowForm(false);
@@ -818,19 +862,17 @@ export default function WorkOrdersPage() {
   const clearTimes = () => {
     setFormData({
       ...formData,
-      pickup_date: '',
       pickup_time: '',
-      delivery_date: '',
       delivery_time: '',
     });
-    setShowTimes(false);
+    setShowTimes(true);
   };
 
   return (
     <MainLayout>
       <Header
         title="Work Orders"
-        subtitle="The main job file: customer, pickup, delivery, billing, POD, notes, and special instructions"
+        subtitle="Condensed work order list. Click any work order row to open the full detailed file."
       />
 
       <div className="page-actions">
@@ -844,14 +886,15 @@ export default function WorkOrdersPage() {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
+        <a
+          href="/wo/new"
+          target="_blank"
+          rel="noreferrer"
           className="btn-primary flex items-center justify-center gap-2"
         >
           <Plus className="h-5 w-5" />
-          Add Work Order
-        </button>
+          Create Work Order
+        </a>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark lg:grid-cols-3">
@@ -887,7 +930,7 @@ export default function WorkOrdersPage() {
         />
       </div>
 
-      {showForm && (
+      {false && showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm dark:bg-black/60">
           <div className="custom-board-scrollbar max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-dark-border dark:bg-dark-card sm:p-8">
             <div className="mb-6 flex items-start justify-between gap-4">
@@ -1115,10 +1158,10 @@ export default function WorkOrdersPage() {
                 >
                   <div>
                     <h3 className="text-lg font-bold text-slate-950 dark:text-white">
-                      Pickup / Delivery Dates and Times
+                      Pickup / Estimated Delivery Dates
                     </h3>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                      Add only when known or appointment-based.
+                      Pickup date and estimated delivery date are required. Times are optional.
                     </p>
                   </div>
 
@@ -1135,6 +1178,7 @@ export default function WorkOrdersPage() {
                       <DateField
                         label="Pickup Date"
                         value={formData.pickup_date}
+                        required
                         onChange={(value) =>
                           setFormData({ ...formData, pickup_date: value })
                         }
@@ -1149,8 +1193,9 @@ export default function WorkOrdersPage() {
                       />
 
                       <DateField
-                        label="Delivery Date"
+                        label="Estimated Delivery Date"
                         value={formData.delivery_date}
+                        required
                         onChange={(value) =>
                           setFormData({ ...formData, delivery_date: value })
                         }
@@ -1170,7 +1215,7 @@ export default function WorkOrdersPage() {
                       onClick={clearTimes}
                       className="mt-4 text-sm font-semibold text-red-300 hover:text-red-200"
                     >
-                      Clear pickup/delivery times
+                      Clear times only
                     </button>
                   </div>
                 )}
@@ -1360,12 +1405,12 @@ export default function WorkOrdersPage() {
                 return (
                   <tr
                     key={workOrder.id}
-                    onClick={() => handleEdit(workOrder)}
-                    className="cursor-pointer transition-colors hover:bg-slate-800/60"
-                    title="Click to view or edit this work order"
+                    onClick={() => openWorkOrderDetail(workOrder)}
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    title="Click to open full work order details"
                   >
                     <td>
-                      <p className="font-bold text-blue-300">
+                      <p className="font-bold text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">
                         {workOrder.work_order_number}
                       </p>
 
@@ -1531,9 +1576,21 @@ export default function WorkOrdersPage() {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
+                            openWorkOrderDetail(workOrder);
+                          }}
+                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          title="Open full work order details"
+                        >
+                          Open
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
                             handleEdit(workOrder);
                           }}
-                          className="text-blue-400 hover:text-blue-300"
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                           title="Edit work order"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -1562,6 +1619,12 @@ export default function WorkOrdersPage() {
       )}
     </MainLayout>
   );
+}
+
+
+function getWorkOrderDetailHref(workOrder: WorkOrder) {
+  const numberOrId = workOrder.work_order_number || workOrder.id;
+  return `/wo/${encodeURIComponent(numberOrId)}`;
 }
 
 function FilterButtonGroup({
@@ -1701,26 +1764,42 @@ function NumberField({
   );
 }
 
+function openNativeDatePicker(input: HTMLInputElement) {
+  try {
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+    }
+  } catch {
+    // Some browsers only allow showPicker during a direct user click/focus event.
+  }
+}
+
 function DateField({
   label,
   value,
   onChange,
+  required = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  required?: boolean;
 }) {
   return (
     <div>
       <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
+        {required && <span className="ml-1 text-red-600 dark:text-red-400">*</span>}
       </label>
 
       <input
         type="date"
-        className="input-field"
+        className="input-field cursor-pointer"
         value={value}
+        onClick={(event) => openNativeDatePicker(event.currentTarget)}
+        onFocus={(event) => openNativeDatePicker(event.currentTarget)}
         onChange={(event) => onChange(event.target.value)}
+        required={required}
       />
     </div>
   );
