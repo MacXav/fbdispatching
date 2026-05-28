@@ -22,6 +22,7 @@ import { Company, Shipment, Truck } from '@/types';
 
 interface TruckRoute {
   truck: Truck;
+  routeDateKey: string;
   shipments: Shipment[];
   gpsReadyShipments: Shipment[];
   missingGpsShipments: Shipment[];
@@ -43,6 +44,9 @@ interface GoogleRouteStop {
   routeBucketLabel?: string;
   address?: string | null;
   city?: string | null;
+  stopPurpose?: 'delivery' | 'pickup';
+  operationalPhase?: number;
+  operationalPhaseLabel?: string;
 }
 
 interface GoogleTruckRouteEstimate {
@@ -62,12 +66,13 @@ export default function RoutesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTruck, setSelectedTruck] = useState<string | null>(null);
+  const [routeDate, setRouteDate] = useState(getTodayDateKey());
   const [googleRoutes, setGoogleRoutes] = useState<Record<string, GoogleTruckRouteEstimate>>({});
   const [calculatingTruckId, setCalculatingTruckId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRoutes();
-  }, []);
+  }, [routeDate]);
 
   const loadRoutes = async () => {
     try {
@@ -83,7 +88,8 @@ export default function RoutesPage() {
 
       const activeShipments = shipments
         .filter((shipment) => shipment.status !== 'delivered')
-        .filter((shipment) => Boolean(shipment.assigned_truck_id));
+        .filter((shipment) => Boolean(shipment.assigned_truck_id))
+        .filter((shipment) => shouldShowShipmentOnRouteDate(shipment, routeDate));
 
       const truckRoutes = trucks.map((truck) => {
         const truckShipments = activeShipments
@@ -98,12 +104,12 @@ export default function RoutesPage() {
           (shipment) => shipment.dispatch_task_type === 'board_stop'
         );
 
-        const gpsReadyShipments = realFreightShipments.filter((shipment) =>
-          Boolean(getShipmentLocationSource(shipment, loadedCompanies || []))
+        const gpsReadyShipments = realFreightShipments.filter(
+          (shipment) => buildOperationalStopsForShipment(shipment, loadedCompanies || [], routeDate).length > 0
         );
 
         const missingGpsShipments = realFreightShipments.filter(
-          (shipment) => !getShipmentLocationSource(shipment, loadedCompanies || [])
+          (shipment) => buildOperationalStopsForShipment(shipment, loadedCompanies || [], routeDate).length === 0
         );
 
         const totalSkids = realFreightShipments.reduce(
@@ -122,6 +128,7 @@ export default function RoutesPage() {
 
         return {
           truck,
+          routeDateKey: routeDate,
           shipments: truckShipments,
           gpsReadyShipments,
           missingGpsShipments,
@@ -184,47 +191,82 @@ export default function RoutesPage() {
       const stopsWithGps = buildGoogleStopsForRoute(route, companies);
 
       if (stopsWithGps.length < 1) {
-        alert('This truck needs at least one freight stop with delivery GPS to calculate a Google route.');
+        alert('This truck needs at least one GPS-ready pickup or delivery stop to calculate a unit route.');
         return;
       }
 
       if (stopsWithGps.length > 26) {
         alert(
-          'This truck has too many GPS-ready freight stops for this route calculation. Limit is 26 delivery stops because the home office is always used as the fixed start.'
+          'This truck has too many GPS-ready stops for this route calculation. Limit is 26 stops because the home office is always used as the fixed start.'
         );
         return;
       }
 
       setCalculatingTruckId(route.truck.id);
 
-      const response = await fetch('/api/google-truck-route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-        body: JSON.stringify({
-          stops: stopsWithGps,
-        }),
-      });
+      const phaseGroups = groupStopsByOperationalPhase(stopsWithGps);
+      const phaseEstimates: GoogleTruckRouteEstimate[] = [];
+      let usedManualFallback = false;
 
-      const data = await response.json();
+      for (const phaseStops of phaseGroups) {
+        if (phaseStops.length <= 1) {
+          phaseEstimates.push(buildManualOperationalRouteEstimate(phaseStops));
+          usedManualFallback = true;
+          continue;
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Could not calculate Google route.');
+        try {
+          const response = await fetch('/api/google-truck-route', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+            body: JSON.stringify({
+              stops: phaseStops,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            console.warn('Google could not calculate this unit route phase:', data.error || data);
+            phaseEstimates.push(buildManualOperationalRouteEstimate(phaseStops));
+            usedManualFallback = true;
+            continue;
+          }
+
+          phaseEstimates.push(data as GoogleTruckRouteEstimate);
+        } catch (phaseError) {
+          console.warn('Google route phase failed:', phaseError);
+          phaseEstimates.push(buildManualOperationalRouteEstimate(phaseStops));
+          usedManualFallback = true;
+        }
       }
+
+      const estimate = combinePhaseRouteEstimates(phaseEstimates, stopsWithGps, usedManualFallback);
 
       setGoogleRoutes((current) => ({
         ...current,
-        [route.truck.id]: data as GoogleTruckRouteEstimate,
+        [route.truck.id]: estimate,
       }));
     } catch (error) {
-      console.error('Google route error:', error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Could not calculate Google route.'
-      );
+      console.error('Unit route error:', error);
+
+      const stopsWithGps = buildGoogleStopsForRoute(route, companies);
+
+      if (stopsWithGps.length > 0) {
+        setGoogleRoutes((current) => ({
+          ...current,
+          [route.truck.id]: buildManualOperationalRouteEstimate(stopsWithGps),
+        }));
+      } else {
+        alert(
+          error instanceof Error
+            ? error.message
+            : 'Could not calculate this unit route.'
+        );
+      }
     } finally {
       setCalculatingTruckId(null);
     }
@@ -233,7 +275,7 @@ export default function RoutesPage() {
   if (loading) {
     return (
       <MainLayout>
-        <Header title="Routes" subtitle="View active truck routes" />
+        <Header title="Routes" subtitle="Optimize delivery order for freight already assigned to trucks" />
 
         <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark py-12 text-center">
           <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-700 dark:text-blue-300" />
@@ -247,30 +289,76 @@ export default function RoutesPage() {
     <MainLayout>
       <Header
         title="Routes"
-        subtitle="View active route stops, Google route estimates, and assigned freight by truck"
+        subtitle="Driver route optimization: sequence the stops after the routing planner assigns freight to trucks"
       />
+
+      <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-900 dark:bg-blue-950/30">
+        <p className="text-sm font-black uppercase tracking-wide text-blue-800 dark:text-blue-200">
+          Route workflow
+        </p>
+
+        <p className="mt-1 text-sm font-semibold leading-6 text-blue-950 dark:text-blue-100">
+          This page builds the selected route date only. Tomorrow pickups can be assigned now, but they will not show on today's driver route.
+        </p>
+      </div>
 
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark p-5">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-xl font-black text-slate-950 dark:text-white">
-              Active truck routes
+              Driver route optimizer
             </h2>
 
             <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-              Every Google route starts from 146 Cushman Road, St. Catharines. Google tests the best delivery ending point and optimizes the middle stops.
+              Pick a route date, then build the unit route. Pickup stops use pickup date; delivery stops use delivery date when available.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={loadRoutes}
-            className="btn-secondary flex items-center justify-center gap-2"
-            disabled={loading || Boolean(calculatingTruckId)}
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Routes
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block">
+              <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                Route Date
+              </span>
+
+              <input
+                type="date"
+                value={routeDate}
+                onClick={(event) => {
+                  try {
+                    event.currentTarget.showPicker?.();
+                  } catch {
+                    // Normal date input still works.
+                  }
+                }}
+                onFocus={(event) => {
+                  try {
+                    event.currentTarget.showPicker?.();
+                  } catch {
+                    // Normal date input still works.
+                  }
+                }}
+                onChange={(event) => {
+                  setRouteDate(event.target.value || getTodayDateKey());
+                  setGoogleRoutes({});
+                }}
+                className="input-field h-11 min-w-[170px] cursor-pointer font-black"
+              />
+
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                {formatFriendlyRouteDate(routeDate)}
+              </p>
+            </label>
+
+            <button
+              type="button"
+              onClick={loadRoutes}
+              className="btn-secondary flex h-11 items-center justify-center gap-2"
+              disabled={loading || Boolean(calculatingTruckId)}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Route Stops
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -284,9 +372,9 @@ export default function RoutesPage() {
       {routes.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark py-12 text-center">
           <TruckIcon className="mx-auto mb-3 h-8 w-8 text-slate-700 dark:text-slate-400" />
-          <p className="font-semibold text-slate-950 dark:text-white">No active routes yet.</p>
+          <p className="font-semibold text-slate-950 dark:text-white">No routes for this date.</p>
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-            Assign pickups or type route notes on the truck board.
+            Assigned stops only appear here when their pickup or delivery date matches the selected route date.
           </p>
         </div>
       ) : (
@@ -339,6 +427,10 @@ export default function RoutesPage() {
                       {route.totalStops} stop(s) • {route.totalSkids} skid(s)
                     </p>
 
+                    <p className={`mt-1 text-xs font-semibold ${selected ? 'text-white' : 'text-blue-700 dark:text-blue-300'}`}>
+                      {formatFriendlyRouteDate(route.routeDateKey)}
+                    </p>
+
                     <p className={`mt-1 text-xs ${selected ? 'text-white' : 'text-slate-700 dark:text-slate-400'}`}>
                       GPS: {route.gpsReadyShipments.length}/{route.totalFreightStops}
                     </p>
@@ -366,6 +458,11 @@ export default function RoutesPage() {
                   googleRoute={selectedGoogleRoute}
                   calculating={calculatingTruckId === selectedRoute.truck.id}
                   onCalculate={() => calculateGoogleRoute(selectedRoute)}
+                />
+
+                <GoogleStopsDebugCard
+                  route={selectedRoute}
+                  companies={companies}
                 />
 
                 {selectedGoogleRoute && (
@@ -421,6 +518,10 @@ function RouteHeaderCard({
           <p className="mt-1 text-slate-700 dark:text-slate-300">
             Driver: {displayValue(route.truck.driver_name, 'No driver assigned')}
           </p>
+
+          <p className="mt-1 text-sm font-black text-blue-700 dark:text-blue-300">
+            Route Date: {formatFriendlyRouteDate(route.routeDateKey)}
+          </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:items-end">
@@ -435,7 +536,7 @@ function RouteHeaderCard({
             ) : (
               <Route className="h-4 w-4" />
             )}
-            {calculating ? 'Calculating...' : googleRoute ? 'Recalculate Google Route' : 'Calculate Google Route'}
+            {calculating ? 'Calculating...' : googleRoute ? 'Recalculate Unit Route' : 'Calculate Unit Route'}
           </button>
 
           {route.gpsReadyShipments.length < 1 && (
@@ -480,7 +581,7 @@ function RouteHeaderCard({
         />
 
         <SmallInfoBox
-          label="Google Route"
+          label="Unit Route"
           value={googleRoute ? `${googleRoute.durationText}` : 'Not calculated'}
           tone={googleRoute ? 'green' : 'slate'}
         />
@@ -488,6 +589,189 @@ function RouteHeaderCard({
     </div>
   );
 }
+
+function GoogleStopsDebugCard({
+  route,
+  companies,
+}: {
+  route: TruckRoute;
+  companies: Company[];
+}) {
+  const [open, setOpen] = useState(false);
+  const stops = buildGoogleStopsForRoute(route, companies);
+  const badStops = stops.filter((stop) => getStopDebugWarnings(stop).length > 0);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-4 text-left"
+      >
+        <div>
+          <h3 className="text-lg font-black text-slate-950 dark:text-white">
+            Debug Google Stops
+          </h3>
+
+          <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-400">
+            Shows exactly what this page sends to Google for {displayValue(route.truck.truck_number)} on {formatFriendlyRouteDate(route.routeDateKey)}.
+          </p>
+        </div>
+
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-black ${
+            badStops.length > 0
+              ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
+              : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+          }`}
+        >
+          {stops.length} stop(s) • {badStops.length} warning(s)
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-dark-border">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+            If Google fails, look for a bad coordinate, reversed latitude/longitude, a coordinate far away from the address, or a stop that has an address but no usable GPS.
+          </div>
+
+          {stops.length === 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              No GPS-ready route stops for this selected route date.
+            </div>
+          ) : (
+            <div className="custom-board-scrollbar max-h-[520px] overflow-y-auto rounded-xl border border-slate-200 dark:border-dark-border">
+              <table className="w-full min-w-[950px] border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-100 text-[10px] font-black uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">#</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">Phase</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">Stop</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">Address</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">GPS Sent</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">Warnings</th>
+                    <th className="border-b border-slate-200 px-3 py-2 dark:border-dark-border">Test</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {stops.map((stop, index) => {
+                    const warnings = getStopDebugWarnings(stop);
+                    const mapsUrl = buildSingleStopGoogleMapsUrl(stop);
+
+                    return (
+                      <tr
+                        key={`${stop.shipmentId}-${index}`}
+                        className="border-b border-slate-100 bg-white align-top last:border-b-0 dark:border-slate-800 dark:bg-slate-950"
+                      >
+                        <td className="px-3 py-3 font-black text-slate-950 dark:text-white">
+                          {index + 1}
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <div className="space-y-1">
+                            <span className="inline-flex rounded bg-blue-700 px-2 py-1 text-[10px] font-black text-white">
+                              {stop.operationalPhaseLabel || 'Route Stop'}
+                            </span>
+
+                            <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                              {stop.stopPurpose || 'delivery'}
+                            </p>
+                          </div>
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <p className="max-w-[190px] truncate font-black text-slate-950 dark:text-white">
+                            {stop.label}
+                          </p>
+
+                          <p className="mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                            ID: {stop.shipmentId}
+                          </p>
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <p className="max-w-[240px] text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            {[stop.address, stop.city].filter(Boolean).join(', ') || 'No address on stop'}
+                          </p>
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <code className="rounded bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+                            {Number(stop.latitude).toFixed(6)}, {Number(stop.longitude).toFixed(6)}
+                          </code>
+                        </td>
+
+                        <td className="px-3 py-3">
+                          {warnings.length > 0 ? (
+                            <div className="space-y-1">
+                              {warnings.map((warning) => (
+                                <p
+                                  key={warning}
+                                  className="rounded bg-red-100 px-2 py-1 text-[10px] font-black text-red-800 dark:bg-red-950 dark:text-red-200"
+                                >
+                                  {warning}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="rounded bg-green-100 px-2 py-1 text-[10px] font-black text-green-800 dark:bg-green-950 dark:text-green-200">
+                              Looks OK
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <a
+                            href={mapsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-[10px] font-black text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Open
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {route.missingGpsShipments.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+              <h4 className="text-sm font-black text-amber-900 dark:text-amber-100">
+                Assigned freight hidden from Google because it has no usable GPS for this route date
+              </h4>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {route.missingGpsShipments.map((shipment) => (
+                  <div
+                    key={shipment.id}
+                    className="rounded-lg border border-amber-200 bg-white p-3 dark:border-amber-900 dark:bg-slate-950"
+                  >
+                    <p className="font-black text-slate-950 dark:text-white">
+                      {getBoardDisplayName(shipment)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      Pickup: {displayLocation(shipment.pickup_address, shipment.pickup_city)}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Delivery: {displayLocation(shipment.delivery_address, shipment.delivery_city)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function GoogleRouteResultCard({
   route,
@@ -504,11 +788,11 @@ function GoogleRouteResultCard({
         <div>
           <h3 className="flex items-center gap-2 text-xl font-black text-slate-950 dark:text-white">
             <Route className="h-5 w-5 text-blue-700 dark:text-blue-300" />
-            Google route estimate
+            Unit route estimate
           </h3>
 
           <p className="mt-1 text-sm text-blue-900 dark:text-blue-800 dark:text-blue-200">
-            This route starts at {googleRoute.originAddress || '146 Cushman Road, St. Catharines'}. Google tests the best final delivery and optimizes the middle stops for the fastest route.
+            This route starts at {googleRoute.originAddress || '146 Cushman Road, St. Catharines'}. The unit route keeps US deliveries before US pickups, then keeps the rest of the assigned stops in one combined route.
           </p>
         </div>
 
@@ -528,12 +812,12 @@ function GoogleRouteResultCard({
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <GoogleStat label="Distance" value={googleRoute.distanceText} />
         <GoogleStat label="Drive Time" value={googleRoute.durationText} />
-        <GoogleStat label="Delivery Stops" value={String(googleRoute.orderedStops.length)} />
+        <GoogleStat label="Route Stops" value={String(googleRoute.orderedStops.length)} />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 dark:border-dark-border dark:bg-slate-950 p-4">
         <h4 className="mb-3 text-sm font-black uppercase tracking-wide text-slate-700 dark:text-slate-400">
-          Optimized stop order from home office
+          Unit route from home office
         </h4>
 
         <div className="mb-2 flex items-start gap-3 rounded-xl border border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-3">
@@ -555,7 +839,7 @@ function GoogleRouteResultCard({
         <div className="space-y-2">
           {googleRoute.orderedStops.map((stop, index) => {
             const matchingShipment = route.shipments.find(
-              (shipment) => shipment.id === stop.shipmentId
+              (shipment) => shipment.id === getShipmentIdFromRouteStop(stop)
             );
 
             return (
@@ -569,6 +853,12 @@ function GoogleRouteResultCard({
 
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
+                    {stop.operationalPhaseLabel && (
+                      <span className="rounded bg-blue-700 px-2 py-1 text-[10px] font-black text-white">
+                        {stop.operationalPhaseLabel}
+                      </span>
+                    )}
+
                     {stop.routeBucketLabel && (
                       <span className="rounded bg-purple-900 px-2 py-1 text-[10px] font-black text-purple-100">
                         {stop.routeBucketLabel}
@@ -687,7 +977,7 @@ function RouteStopsCard({
 
   if (googleRoute) {
     googleRoute.orderedStops.forEach((stop, index) => {
-      googleOrderByShipmentId.set(stop.shipmentId, index + 1);
+      googleOrderByShipmentId.set(getShipmentIdFromRouteStop(stop), index + 1);
     });
   }
 
@@ -1011,35 +1301,248 @@ function FreightStop({ shipment }: { shipment: Shipment }) {
   );
 }
 
+function groupStopsByOperationalPhase(stops: GoogleRouteStop[]) {
+  const phaseMap = new Map<number, GoogleRouteStop[]>();
+
+  stops.forEach((stop) => {
+    const phase = Number(stop.operationalPhase || 99);
+    const current = phaseMap.get(phase) || [];
+    current.push(stop);
+    phaseMap.set(phase, current);
+  });
+
+  return Array.from(phaseMap.entries())
+    .sort(([aPhase], [bPhase]) => aPhase - bPhase)
+    .map(([, phaseStops]) => phaseStops);
+}
+
+function combinePhaseRouteEstimates(
+  phaseEstimates: GoogleTruckRouteEstimate[],
+  originalStops: GoogleRouteStop[],
+  usedManualFallback = false
+): GoogleTruckRouteEstimate {
+  const firstEstimate = phaseEstimates[0];
+  const orderedStops = phaseEstimates.flatMap((estimate) => estimate.orderedStops);
+  const operationalOrderedStops = applyOperationalStopOrder(orderedStops, originalStops);
+  const distanceMeters = phaseEstimates.reduce(
+    (sum, estimate) => sum + Number(estimate.distanceMeters || 0),
+    0
+  );
+  const distanceKm = distanceMeters / 1000;
+  const durationSeconds = phaseEstimates.reduce(
+    (sum, estimate) => sum + parseDurationToSeconds(estimate.duration),
+    0
+  );
+  const staticDurationSeconds = phaseEstimates.reduce(
+    (sum, estimate) => sum + parseDurationToSeconds(estimate.staticDuration),
+    0
+  );
+
+  return {
+    originAddress: firstEstimate?.originAddress || '146 Cushman Road, St. Catharines, ON',
+    distanceMeters,
+    distanceKm,
+    distanceText: usedManualFallback
+      ? distanceKm > 0
+        ? `${distanceKm.toFixed(1)} km + manual stop(s)`
+        : 'Manual operational order'
+      : `${distanceKm.toFixed(1)} km`,
+    duration: `${durationSeconds}s`,
+    durationText: usedManualFallback
+      ? durationSeconds > 0
+        ? `${formatDurationSeconds(durationSeconds)} + manual stop(s)`
+        : 'Manual operational order'
+      : formatDurationSeconds(durationSeconds),
+    staticDuration: `${staticDurationSeconds}s`,
+    staticDurationText: usedManualFallback
+      ? staticDurationSeconds > 0
+        ? `${formatDurationSeconds(staticDurationSeconds)} + manual stop(s)`
+        : 'Manual operational order'
+      : formatDurationSeconds(staticDurationSeconds),
+    orderedStops: operationalOrderedStops,
+  };
+}
+
+function buildManualOperationalRouteEstimate(
+  originalStops: GoogleRouteStop[]
+): GoogleTruckRouteEstimate {
+  const orderedStops = originalStops
+    .slice()
+    .sort((a, b) => {
+      const phaseDiff = Number(a.operationalPhase || 99) - Number(b.operationalPhase || 99);
+
+      if (phaseDiff !== 0) {
+        return phaseDiff;
+      }
+
+      return String(a.label).localeCompare(String(b.label));
+    });
+
+  return {
+    originAddress: '146 Cushman Road, St. Catharines, ON',
+    distanceMeters: 0,
+    distanceKm: 0,
+    distanceText: 'Google route unavailable',
+    duration: '0s',
+    durationText: 'Google route unavailable',
+    staticDuration: '0s',
+    staticDurationText: 'Google route unavailable',
+    orderedStops,
+  };
+}
+
+function parseDurationToSeconds(value?: string | null) {
+  if (!value) {
+    return 0;
+  }
+
+  const match = String(value).match(/(\d+)/);
+
+  if (!match) {
+    return 0;
+  }
+
+  return Number(match[1]);
+}
+
+function formatDurationSeconds(totalSeconds: number) {
+  if (!totalSeconds) {
+    return 'Google route unavailable';
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.round((totalSeconds % 3600) / 60);
+
+  if (hours <= 0) {
+    return `${minutes} min`;
+  }
+
+  if (minutes <= 0) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${minutes} min`;
+}
+
 function buildGoogleStopsForRoute(
   route: TruckRoute,
   companies: Company[]
 ): GoogleRouteStop[] {
-  return route.gpsReadyShipments
-    .map((shipment): GoogleRouteStop | null => {
-      const locationSource = getShipmentLocationSource(shipment, companies);
+  const stops = route.gpsReadyShipments.flatMap((shipment) =>
+    buildOperationalStopsForShipment(shipment, companies, route.routeDateKey)
+  );
 
-      if (!locationSource) {
-        return null;
-      }
+  return stops.sort((a, b) => {
+    const phaseDiff = Number(a.operationalPhase || 99) - Number(b.operationalPhase || 99);
 
-      const bucket = getRouteBucket(shipment);
+    if (phaseDiff !== 0) {
+      return phaseDiff;
+    }
 
-      return {
-        shipmentId: shipment.id,
-        label: getGoogleStopLabel(shipment),
-        latitude: locationSource.latitude,
-        longitude: locationSource.longitude,
+    return String(a.label).localeCompare(String(b.label));
+  });
+}
+
+function buildOperationalStopsForShipment(
+  shipment: Shipment,
+  companies: Company[],
+  routeDateKey?: string
+): GoogleRouteStop[] {
+  const stops: GoogleRouteStop[] = [];
+  const stopType = shipment.board_stop_type || 'delivery';
+
+  if (stopType !== 'pickup' && stopMatchesRouteDate(shipment, 'delivery', routeDateKey)) {
+    const deliveryLocation = getDeliveryLocationSource(shipment, companies);
+
+    if (deliveryLocation) {
+      const bucket = getRouteBucket(shipment, 'delivery');
+      const phase = getOperationalPhase(shipment, 'delivery');
+
+      stops.push({
+        shipmentId:
+          stopType === 'pickup_and_delivery'
+            ? `${shipment.id}:delivery`
+            : shipment.id,
+        label: getGoogleStopLabel(shipment, 'delivery'),
+        latitude: deliveryLocation.latitude,
+        longitude: deliveryLocation.longitude,
         routeBucket: bucket.key,
         routeBucketLabel: bucket.label,
         address: shipment.delivery_address,
         city: shipment.delivery_city,
-      };
-    })
-    .filter((stop): stop is GoogleRouteStop => stop !== null);
+        stopPurpose: 'delivery',
+        operationalPhase: phase.order,
+        operationalPhaseLabel: phase.label,
+      });
+    }
+  }
+
+  if (
+    (stopType === 'pickup' || stopType === 'pickup_and_delivery') &&
+    stopMatchesRouteDate(shipment, 'pickup', routeDateKey)
+  ) {
+    const pickupLocation = getPickupLocationSource(shipment, companies);
+
+    if (pickupLocation) {
+      const bucket = getRouteBucket(shipment, 'pickup');
+      const phase = getOperationalPhase(shipment, 'pickup');
+
+      stops.push({
+        shipmentId:
+          stopType === 'pickup_and_delivery'
+            ? `${shipment.id}:pickup`
+            : shipment.id,
+        label: getGoogleStopLabel(shipment, 'pickup'),
+        latitude: pickupLocation.latitude,
+        longitude: pickupLocation.longitude,
+        routeBucket: bucket.key,
+        routeBucketLabel: bucket.label,
+        address: shipment.pickup_address,
+        city: shipment.pickup_city,
+        stopPurpose: 'pickup',
+        operationalPhase: phase.order,
+        operationalPhaseLabel: phase.label,
+      });
+    }
+  }
+
+  return stops;
 }
 
-function getRouteBucket(shipment: Shipment) {
+function applyOperationalStopOrder(
+  googleOrderedStops: GoogleRouteStop[],
+  originalStops: GoogleRouteStop[]
+) {
+  const originalStopById = new Map(
+    originalStops.map((stop) => [stop.shipmentId, stop])
+  );
+
+  return googleOrderedStops
+    .map((stop, index) => {
+      const originalStop = originalStopById.get(stop.shipmentId);
+
+      return {
+        ...stop,
+        ...originalStop,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+        address: originalStop?.address ?? stop.address,
+        city: originalStop?.city ?? stop.city,
+        googleOrder: index + 1,
+      } as GoogleRouteStop & { googleOrder?: number };
+    })
+    .sort((a, b) => {
+      const phaseDiff = Number(a.operationalPhase || 99) - Number(b.operationalPhase || 99);
+
+      if (phaseDiff !== 0) {
+        return phaseDiff;
+      }
+
+      return Number(a.googleOrder || 999) - Number(b.googleOrder || 999);
+    });
+}
+
+function getRouteBucket(shipment: Shipment, purpose: 'delivery' | 'pickup' = 'delivery') {
   const deliveryText = normalizeRouteText(
     [
       shipment.delivery_company_name,
@@ -1087,17 +1590,27 @@ function getRouteBucket(shipment: Shipment) {
     };
   }
 
-  if (shipment.delivery_city && shipment.delivery_city.trim() !== '') {
+  const city =
+    purpose === 'pickup'
+      ? shipment.pickup_city
+      : shipment.delivery_city;
+
+  const companyName =
+    purpose === 'pickup'
+      ? shipment.pickup_company_name
+      : shipment.delivery_company_name;
+
+  if (city && city.trim() !== '') {
     return {
-      key: `city_${normalizeRouteKey(shipment.delivery_city)}`,
-      label: shipment.delivery_city,
+      key: `city_${normalizeRouteKey(city)}`,
+      label: city,
     };
   }
 
-  if (shipment.delivery_company_name && shipment.delivery_company_name.trim() !== '') {
+  if (companyName && companyName.trim() !== '') {
     return {
-      key: `company_${normalizeRouteKey(shipment.delivery_company_name)}`,
-      label: shipment.delivery_company_name,
+      key: `company_${normalizeRouteKey(companyName)}`,
+      label: companyName,
     };
   }
 
@@ -1137,7 +1650,20 @@ function getBoardDisplayName(shipment: Shipment) {
   );
 }
 
-function getGoogleStopLabel(shipment: Shipment) {
+function getGoogleStopLabel(
+  shipment: Shipment,
+  purpose: 'delivery' | 'pickup' = 'delivery'
+) {
+  if (purpose === 'pickup') {
+    return (
+      shipment.pickup_company_name ||
+      shipment.board_name ||
+      shipment.work_order_number ||
+      displayLocation(shipment.pickup_address, shipment.pickup_city) ||
+      'Pickup stop'
+    );
+  }
+
   return (
     shipment.delivery_company_name ||
     shipment.board_name ||
@@ -1156,6 +1682,13 @@ function getStopTypeLabel(stopType?: string | null) {
 }
 
 function getShipmentLocationSource(
+  shipment: Shipment,
+  companies: Company[]
+): { latitude: number; longitude: number; source: 'shipment' | 'company' } | null {
+  return getDeliveryLocationSource(shipment, companies);
+}
+
+function getDeliveryLocationSource(
   shipment: Shipment,
   companies: Company[]
 ): { latitude: number; longitude: number; source: 'shipment' | 'company' } | null {
@@ -1180,6 +1713,31 @@ function getShipmentLocationSource(
   return null;
 }
 
+function getPickupLocationSource(
+  shipment: Shipment,
+  companies: Company[]
+): { latitude: number; longitude: number; source: 'shipment' | 'company' } | null {
+  if (shipmentHasPickupGps(shipment)) {
+    return {
+      latitude: Number((shipment as Shipment & { pickup_latitude?: number | string | null }).pickup_latitude),
+      longitude: Number((shipment as Shipment & { pickup_longitude?: number | string | null }).pickup_longitude),
+      source: 'shipment',
+    };
+  }
+
+  const pickupCompany = findPickupCompany(shipment, companies);
+
+  if (pickupCompany && hasCoordinates(pickupCompany)) {
+    return {
+      latitude: Number(pickupCompany.latitude),
+      longitude: Number(pickupCompany.longitude),
+      source: 'company',
+    };
+  }
+
+  return null;
+}
+
 function shipmentHasDeliveryGps(shipment: Shipment) {
   return (
     shipment.delivery_latitude !== null &&
@@ -1189,6 +1747,83 @@ function shipmentHasDeliveryGps(shipment: Shipment) {
     !Number.isNaN(Number(shipment.delivery_latitude)) &&
     !Number.isNaN(Number(shipment.delivery_longitude))
   );
+}
+
+function shipmentHasPickupGps(shipment: Shipment) {
+  const pickupLatitude = (shipment as Shipment & { pickup_latitude?: number | string | null }).pickup_latitude;
+  const pickupLongitude = (shipment as Shipment & { pickup_longitude?: number | string | null }).pickup_longitude;
+
+  return (
+    pickupLatitude !== null &&
+    pickupLatitude !== undefined &&
+    pickupLongitude !== null &&
+    pickupLongitude !== undefined &&
+    !Number.isNaN(Number(pickupLatitude)) &&
+    !Number.isNaN(Number(pickupLongitude))
+  );
+}
+
+function findPickupCompany(
+  shipment: Shipment,
+  companies: Company[]
+) {
+  const pickupName = normalizeName(shipment.pickup_company_name);
+
+  if (pickupName) {
+    const byName = companies.find(
+      (company) => normalizeName(company.name) === pickupName
+    );
+
+    if (byName) {
+      return byName;
+    }
+  }
+
+  const shipmentAddress = normalizeAddress(shipment.pickup_address);
+  const shipmentCity = normalizeAddress(shipment.pickup_city);
+  const shipmentPostalCode = normalizePostalCode(shipment.pickup_postal_code);
+
+  if (!shipmentAddress && !shipmentCity && !shipmentPostalCode) {
+    return null;
+  }
+
+  const exactAddressCityPostal = companies.find((company) => {
+    return (
+      normalizeAddress(company.address) === shipmentAddress &&
+      normalizeAddress(company.city) === shipmentCity &&
+      normalizePostalCode(company.postal_code) === shipmentPostalCode &&
+      Boolean(shipmentAddress || shipmentCity || shipmentPostalCode)
+    );
+  });
+
+  if (exactAddressCityPostal) {
+    return exactAddressCityPostal;
+  }
+
+  const exactAddressCity = companies.find((company) => {
+    return (
+      normalizeAddress(company.address) === shipmentAddress &&
+      normalizeAddress(company.city) === shipmentCity &&
+      Boolean(shipmentAddress && shipmentCity)
+    );
+  });
+
+  if (exactAddressCity) {
+    return exactAddressCity;
+  }
+
+  const exactAddressMatches = companies.filter((company) => {
+    return (
+      normalizeAddress(company.address) === shipmentAddress &&
+      Boolean(shipmentAddress)
+    );
+  });
+
+  if (exactAddressMatches.length === 1) {
+    return exactAddressMatches[0];
+  }
+
+  return null;
 }
 
 function findDeliveryCompany(
@@ -1265,6 +1900,55 @@ function hasCoordinates(company: Company) {
   );
 }
 
+function getStopDebugWarnings(stop: GoogleRouteStop) {
+  const warnings: string[] = [];
+  const latitude = Number(stop.latitude);
+  const longitude = Number(stop.longitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    warnings.push('Invalid GPS number');
+    return warnings;
+  }
+
+  if (latitude === 0 && longitude === 0) {
+    warnings.push('GPS is 0,0');
+  }
+
+  if (Math.abs(latitude) > 90) {
+    warnings.push('Latitude outside valid range');
+  }
+
+  if (Math.abs(longitude) > 180) {
+    warnings.push('Longitude outside valid range');
+  }
+
+  if (Math.abs(latitude) > 55 && Math.abs(longitude) < 55) {
+    warnings.push('Latitude/longitude may be reversed');
+  }
+
+  if (latitude > 35 && latitude < 50 && longitude > 35 && longitude < 90) {
+    warnings.push('Longitude is positive; Ontario/NY should usually be negative');
+  }
+
+  if (latitude < 35 || latitude > 50 || longitude < -95 || longitude > -70) {
+    warnings.push('GPS is far outside Ontario / nearby US area');
+  }
+
+  if (!stop.address && !stop.city) {
+    warnings.push('No address text shown for stop');
+  }
+
+  return warnings;
+}
+
+function buildSingleStopGoogleMapsUrl(stop: GoogleRouteStop) {
+  const destination = `${stop.latitude},${stop.longitude}`;
+
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+    '146 Cushman Road, St. Catharines, ON'
+  )}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+}
+
 function buildGoogleMapsDirectionsUrl(stops: GoogleRouteStop[]) {
   if (stops.length < 1) {
     return '';
@@ -1292,6 +1976,167 @@ function buildGoogleMapsDirectionsUrl(stops: GoogleRouteStop[]) {
   }
 
   return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function shouldShowShipmentOnRouteDate(shipment: Shipment, routeDateKey: string) {
+  const stopType = shipment.board_stop_type || 'delivery';
+
+  if (shipment.dispatch_task_type === 'board_stop') {
+    return true;
+  }
+
+  if (stopType === 'pickup') {
+    return stopMatchesRouteDate(shipment, 'pickup', routeDateKey);
+  }
+
+  if (stopType === 'pickup_and_delivery') {
+    return (
+      stopMatchesRouteDate(shipment, 'pickup', routeDateKey) ||
+      stopMatchesRouteDate(shipment, 'delivery', routeDateKey)
+    );
+  }
+
+  return stopMatchesRouteDate(shipment, 'delivery', routeDateKey);
+}
+
+function stopMatchesRouteDate(
+  shipment: Shipment,
+  purpose: 'delivery' | 'pickup',
+  routeDateKey?: string
+) {
+  if (!routeDateKey) {
+    return true;
+  }
+
+  const stopDateKey = getRouteStopDateKey(shipment, purpose);
+
+  if (!stopDateKey) {
+    return false;
+  }
+
+  return stopDateKey === routeDateKey;
+}
+
+function getRouteStopDateKey(
+  shipment: Shipment,
+  purpose: 'delivery' | 'pickup'
+) {
+  if (purpose === 'pickup') {
+    return getDateKey(shipment.pickup_date);
+  }
+
+  return getDateKey(shipment.delivery_date);
+}
+
+function getTodayDateKey() {
+  return formatDateKey(new Date());
+}
+
+function getDateKey(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatFriendlyRouteDate(value?: string | null) {
+  const dateKey = getDateKey(value);
+
+  if (!dateKey) {
+    return 'No route date';
+  }
+
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = date.toLocaleDateString('en-CA', { weekday: 'long' });
+  const monthName = date.toLocaleDateString('en-CA', { month: 'long' });
+
+  return `${weekday}, ${monthName} ${getOrdinalDay(day)}`;
+}
+
+function getOrdinalDay(day: number) {
+  const suffix =
+    day % 10 === 1 && day % 100 !== 11
+      ? 'st'
+      : day % 10 === 2 && day % 100 !== 12
+        ? 'nd'
+        : day % 10 === 3 && day % 100 !== 13
+          ? 'rd'
+          : 'th';
+
+  return `${day}${suffix}`;
+}
+
+function getOperationalPhase(
+  shipment: Shipment,
+  purpose: 'delivery' | 'pickup'
+) {
+  const countryText =
+    purpose === 'pickup'
+      ? [shipment.pickup_company_name, shipment.pickup_address, shipment.pickup_city, shipment.pickup_postal_code].join(' ')
+      : [shipment.delivery_company_name, shipment.delivery_address, shipment.delivery_city, shipment.delivery_postal_code].join(' ');
+
+  const isUsStop = isUnitedStatesStop(countryText);
+
+  if (isUsStop && purpose === 'delivery') {
+    return {
+      order: 10,
+      label: 'US Delivery',
+    };
+  }
+
+  if (isUsStop && purpose === 'pickup') {
+    return {
+      order: 20,
+      label: 'US Pickup After Deliveries',
+    };
+  }
+
+  if (purpose === 'delivery') {
+    return {
+      order: 30,
+      label: 'Canada / Regular Delivery',
+    };
+  }
+
+  return {
+    order: 40,
+    label: 'Canada / Regular Pickup',
+  };
+}
+
+function isUnitedStatesStop(value?: string | null) {
+  const text = normalizeRouteText(value || '');
+
+  return (
+    text.includes(' usa ') ||
+    text.endsWith(' usa') ||
+    text.includes(' united states') ||
+    text.includes(' new york') ||
+    text.includes(' ny ') ||
+    text.endsWith(' ny') ||
+    text.includes('buffalo') ||
+    text.includes('cheektowaga') ||
+    text.includes('tonawanda') ||
+    text.includes('amherst') ||
+    text.includes('kenmore') ||
+    text.includes('niagara falls ny') ||
+    text.includes('rochester') ||
+    text.includes('syracuse')
+  );
+}
+
+function getShipmentIdFromRouteStop(stop: GoogleRouteStop) {
+  return stop.shipmentId.split(':')[0];
 }
 
 function normalizeName(value?: string | null) {

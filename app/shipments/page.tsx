@@ -85,7 +85,7 @@ export default function PickupsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'active' | 'all' | 'completed'>('active');
+  const [pickupDateFilter, setPickupDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'future'>('all');
   const [docFilter, setDocFilter] = useState<'all' | 'received' | 'missing'>('all');
   const [canFilter, setCanFilter] = useState<'all' | 'canada' | 'not_canada'>('all');
 
@@ -194,10 +194,13 @@ export default function PickupsPage() {
         .toLowerCase()
         .includes(lowerSearch);
 
-    const matchesActive =
-      activeFilter === 'all' ||
-      (activeFilter === 'active' && shipment.status !== 'delivered') ||
-      (activeFilter === 'completed' && shipment.status === 'delivered');
+    const matchesActive = shipment.status !== 'delivered';
+
+    const pickupDateBucket = getPickupDateBucketLabel(shipment.pickup_date).toLowerCase();
+
+    const matchesPickupDate =
+      pickupDateFilter === 'all' ||
+      pickupDateBucket === pickupDateFilter;
 
     const matchesDocs =
       docFilter === 'all' ||
@@ -209,8 +212,8 @@ export default function PickupsPage() {
       (canFilter === 'canada' && Boolean(shipment.stays_in_canada)) ||
       (canFilter === 'not_canada' && !shipment.stays_in_canada);
 
-    return matchesSearch && matchesActive && matchesDocs && matchesCanada;
-  });
+    return matchesSearch && matchesActive && matchesPickupDate && matchesDocs && matchesCanada;
+  }).sort(sortPickupsBySchedule);
 
   const allFilteredSelected =
     filteredShipments.length > 0 &&
@@ -416,6 +419,12 @@ export default function PickupsPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
+    if (!formData.pickup_date) {
+      setShowTimes(true);
+      alert('Pickup date is required so future pickups do not show on today\'s dashboard.');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -500,7 +509,7 @@ export default function PickupsPage() {
       stays_in_canada: Boolean(shipment.stays_in_canada),
     });
 
-    setShowTimes(hasTimes);
+    setShowTimes(false);
     setEditingId(shipment.id);
     setShowForm(true);
   };
@@ -572,6 +581,16 @@ export default function PickupsPage() {
     }
   };
 
+  const openAddPickupForm = () => {
+    setFormData({
+      ...emptyForm,
+      pickup_date: getTodayDateKey(),
+    });
+    setShowTimes(false);
+    setEditingId(null);
+    setShowForm(true);
+  };
+
   const resetForm = () => {
     setFormData(emptyForm);
     setShowTimes(false);
@@ -582,19 +601,18 @@ export default function PickupsPage() {
   const clearTimes = () => {
     setFormData({
       ...formData,
-      pickup_date: '',
       pickup_time: '',
       delivery_date: '',
       delivery_time: '',
     });
-    setShowTimes(false);
+    setShowTimes(true);
   };
 
   return (
     <MainLayout>
       <Header
         title="Pickups"
-        subtitle="Create dispatch tasks for the truck board. These can exist with or without a work order."
+        subtitle="Create and schedule pickups. Today and overdue pickups show on the dashboard."
       />
 
       <div className="page-actions">
@@ -624,7 +642,7 @@ export default function PickupsPage() {
 
         <button
           type="button"
-          onClick={() => setShowForm(true)}
+          onClick={openAddPickupForm}
           className="btn-primary flex items-center justify-center gap-2"
         >
           <Plus className="h-5 w-5" />
@@ -634,14 +652,17 @@ export default function PickupsPage() {
 
       <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark lg:grid-cols-3">
         <FilterButtonGroup
-          label="Status"
-          value={activeFilter}
+          label="Pickup Date"
+          value={pickupDateFilter}
           options={[
-            { value: 'active', label: 'Active' },
-            { value: 'all', label: 'All' },
-            { value: 'completed', label: 'Completed' },
+            { value: 'all', label: 'All Active' },
+            { value: 'today', label: 'Today' },
+            { value: 'tomorrow', label: 'Tomorrow' },
+            { value: 'future', label: 'Future' },
           ]}
-          onChange={(value) => setActiveFilter(value as 'active' | 'all' | 'completed')}
+          onChange={(value) =>
+            setPickupDateFilter(value as 'all' | 'today' | 'tomorrow' | 'future')
+          }
         />
 
         <FilterButtonGroup
@@ -840,6 +861,91 @@ export default function PickupsPage() {
                 </div>
               </div>
 
+              <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+                <div className="mb-4">
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">
+                    Pickup Schedule <span className="text-red-600 dark:text-red-400">*</span>
+                  </h3>
+
+                  <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Required. Only pickups dated today or overdue will appear on the dashboard. Future pickups stay scheduled until their pickup date.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <DateField
+                    label="Pickup Date"
+                    value={formData.pickup_date}
+                    required
+                    onChange={(value) =>
+                      setFormData({ ...formData, pickup_date: value })
+                    }
+                  />
+
+                  <TimeField
+                    label="Pickup Time"
+                    value={formData.pickup_time}
+                    onChange={(value) =>
+                      setFormData({ ...formData, pickup_time: value })
+                    }
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTimes(!showTimes)}
+                  className="mt-5 flex w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 text-left transition hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:hover:bg-slate-800"
+                >
+                  <div>
+                    <p className="text-sm font-black text-slate-950 dark:text-white">
+                      Delivery date / appointment details
+                    </p>
+
+                    <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Optional. Add this only when there is a known delivery date or appointment time.
+                    </p>
+                  </div>
+
+                  {showTimes ? (
+                    <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                  )}
+                </button>
+
+                {showTimes && (
+                  <div className="mt-4 grid grid-cols-1 gap-4 border-t border-blue-200 pt-4 dark:border-blue-900 md:grid-cols-2">
+                    <DateField
+                      label="Delivery Date"
+                      value={formData.delivery_date}
+                      onChange={(value) =>
+                        setFormData({ ...formData, delivery_date: value })
+                      }
+                    />
+
+                    <TimeField
+                      label="Delivery Time"
+                      value={formData.delivery_time}
+                      onChange={(value) =>
+                        setFormData({ ...formData, delivery_time: value })
+                      }
+                    />
+
+                    <div className="md:col-span-2">
+                      <button
+                        type="button"
+                        onClick={clearTimes}
+                        className="text-sm font-bold text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200"
+                      >
+                        Clear optional delivery/time fields
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
                 <h3 className="mb-4 text-lg font-bold text-slate-950 dark:text-white">
                   Pickup Flags
@@ -888,75 +994,6 @@ export default function PickupsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-dark-border dark:bg-slate-900/50">
-                <button
-                  type="button"
-                  onClick={() => setShowTimes(!showTimes)}
-                  className="flex w-full items-center justify-between gap-3 text-left"
-                >
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">
-                      Click to add pickup/delivery times
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                      Add times only if there is an appointment or known time.
-                    </p>
-                  </div>
-
-                  {showTimes ? (
-                    <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-                  )}
-                </button>
-
-                {showTimes && (
-                  <div className="mt-5 border-t border-slate-200 pt-5 dark:border-dark-border">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <DateField
-                        label="Pickup Date"
-                        value={formData.pickup_date}
-                        onChange={(value) =>
-                          setFormData({ ...formData, pickup_date: value })
-                        }
-                      />
-
-                      <TimeField
-                        label="Pickup Time"
-                        value={formData.pickup_time}
-                        onChange={(value) =>
-                          setFormData({ ...formData, pickup_time: value })
-                        }
-                      />
-
-                      <DateField
-                        label="Delivery Date"
-                        value={formData.delivery_date}
-                        onChange={(value) =>
-                          setFormData({ ...formData, delivery_date: value })
-                        }
-                      />
-
-                      <TimeField
-                        label="Delivery Time"
-                        value={formData.delivery_time}
-                        onChange={(value) =>
-                          setFormData({ ...formData, delivery_time: value })
-                        }
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={clearTimes}
-                      className="mt-4 text-sm font-semibold text-red-300 hover:text-red-200"
-                    >
-                      Clear pickup/delivery times
-                    </button>
-                  </div>
-                )}
-              </div>
-
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
@@ -1003,6 +1040,7 @@ export default function PickupsPage() {
                   />
                 </th>
                 <th>Board Name</th>
+                <th>Pickup Date</th>
                 <th>Pickup</th>
                 <th>Going To</th>
                 <th>Skids / Weight</th>
@@ -1041,6 +1079,20 @@ export default function PickupsPage() {
                       <p className="mt-1 text-xs capitalize text-slate-500 dark:text-slate-400">
                         {(shipment.board_stop_type || 'pickup').replace(/_/, ' ')}
                       </p>
+                    </td>
+
+                    <td>
+                      <p className="whitespace-nowrap text-sm font-black text-slate-950 dark:text-white">
+                        {formatFriendlyPickupDate(shipment.pickup_date)}
+                      </p>
+
+                      <span
+                        className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${getPickupDateBadgeClass(
+                          shipment.pickup_date
+                        )}`}
+                      >
+                        {getPickupDateBucketLabel(shipment.pickup_date)}
+                      </span>
                     </td>
 
                     <td>
@@ -1337,21 +1389,39 @@ function DateField({
   label,
   value,
   onChange,
+  required = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  required?: boolean;
 }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+      <label className="mb-2 block text-sm font-bold text-slate-800 dark:text-slate-300">
         {label}
+        {required && <span className="ml-1 text-red-600 dark:text-red-400">*</span>}
       </label>
 
       <input
         type="date"
-        className="input-field"
+        className="input-field cursor-pointer font-semibold"
         value={value}
+        required={required}
+        onClick={(event) => {
+          try {
+            event.currentTarget.showPicker?.();
+          } catch {
+            // Browser may block showPicker in some cases. The normal date input still works.
+          }
+        }}
+        onFocus={(event) => {
+          try {
+            event.currentTarget.showPicker?.();
+          } catch {
+            // Browser may block showPicker in some cases. The normal date input still works.
+          }
+        }}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
@@ -1781,4 +1851,131 @@ function displayLocation(address?: string | null, city?: string | null) {
   }
 
   return parts.join(', ');
+}
+
+function sortPickupsBySchedule(a: Shipment, b: Shipment) {
+  const today = getTodayDateKey();
+  const aKey = getDateKey(a.pickup_date);
+  const bKey = getDateKey(b.pickup_date);
+
+  const aRank = getPickupDateRank(aKey, today);
+  const bRank = getPickupDateRank(bKey, today);
+
+  if (aRank !== bRank) {
+    return aRank - bRank;
+  }
+
+  if (aKey !== bKey) {
+    return aKey.localeCompare(bKey);
+  }
+
+  return safeString(a.pickup_time).localeCompare(safeString(b.pickup_time));
+}
+
+function getPickupDateRank(dateKey: string, todayKey: string) {
+  if (!dateKey) return 5;
+  if (dateKey < todayKey) return 0;
+  if (dateKey === todayKey) return 1;
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = formatDateKey(tomorrow);
+
+  if (dateKey === tomorrowKey) return 2;
+
+  return 3;
+}
+
+function getDateKey(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatFriendlyPickupDate(value?: string | null) {
+  const dateKey = getDateKey(value);
+
+  if (!dateKey) {
+    return 'No date';
+  }
+
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = date.toLocaleDateString('en-CA', { weekday: 'long' });
+  const monthName = date.toLocaleDateString('en-CA', { month: 'long' });
+
+  return `${weekday}, ${monthName} ${getOrdinalDay(day)}`;
+}
+
+function getOrdinalDay(day: number) {
+  const suffix =
+    day % 10 === 1 && day % 100 !== 11
+      ? 'st'
+      : day % 10 === 2 && day % 100 !== 12
+        ? 'nd'
+        : day % 10 === 3 && day % 100 !== 13
+          ? 'rd'
+          : 'th';
+
+  return `${day}${suffix}`;
+}
+
+function getPickupDateBucketLabel(value?: string | null) {
+  const today = getTodayDateKey();
+  const dateKey = getDateKey(value);
+
+  if (!dateKey) return 'No date';
+  if (dateKey < today) return 'Today';
+  if (dateKey === today) return 'Today';
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (dateKey === formatDateKey(tomorrow)) return 'Tomorrow';
+
+  return 'Future';
+}
+
+function getPickupDateBadgeClass(value?: string | null) {
+  const label = getPickupDateBucketLabel(value);
+
+  if (label === 'Today') {
+    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+  }
+
+  if (label === 'Tomorrow') {
+    return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+  }
+
+  if (label === 'Future') {
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  }
+
+  return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
+}
+
+function getTodayDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+
+
+function safeString(value?: string | number | null) {
+  if (value === null || value === undefined) return '';
+  return String(value);
 }

@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import {
   ChevronDown,
   ChevronUp,
+  Copy,
   Edit2,
   PackagePlus,
   Plus,
@@ -124,6 +125,7 @@ export default function WorkOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [creatingPickupId, setCreatingPickupId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -132,12 +134,6 @@ export default function WorkOrdersPage() {
   const [editingNumber, setEditingNumber] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<
-    'active' | 'all' | WorkOrderStatus
-  >('active');
-  const [invoiceFilter, setInvoiceFilter] = useState<'all' | InvoiceStatus>('all');
-  const [priorityFilter, setPriorityFilter] = useState<'all' | PriorityLevel>('all');
-
   const [creatingCompanyField, setCreatingCompanyField] = useState<
     'customer' | 'bill_to' | 'pickup' | 'delivery' | null
   >(null);
@@ -146,7 +142,7 @@ export default function WorkOrdersPage() {
 
   const openWorkOrderDetail = (workOrder: WorkOrder) => {
     const href = getWorkOrderDetailHref(workOrder);
-    window.open(href, '_blank', 'noopener,noreferrer');
+    window.open(href, '_blank');
   };
 
   useEffect(() => {
@@ -245,48 +241,27 @@ export default function WorkOrdersPage() {
   const filteredWorkOrders = workOrders.filter((workOrder) => {
     const lowerSearch = searchTerm.trim().toLowerCase();
 
-    const matchesSearch =
-      lowerSearch === '' ||
-      [
-        workOrder.work_order_number,
-        workOrder.customer_company_name,
-        workOrder.bill_to_company_name,
-        workOrder.customer_reference,
-        workOrder.pickup_reference,
-        workOrder.delivery_reference,
-        workOrder.service_type,
-        workOrder.priority_level,
-        workOrder.invoice_status,
-        workOrder.status,
-        workOrder.pickup_company_name,
-        workOrder.delivery_company_name,
-        workOrder.pickup_city,
-        workOrder.delivery_city,
-        workOrder.board_name,
-        workOrder.board_note,
-        workOrder.special_instructions,
-        workOrder.internal_notes,
-        workOrder.billing_notes,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(lowerSearch);
+    if (!lowerSearch) {
+      return true;
+    }
 
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' &&
-        workOrder.status !== 'completed' &&
-        workOrder.status !== 'cancelled') ||
-      workOrder.status === statusFilter;
-
-    const matchesInvoice =
-      invoiceFilter === 'all' || workOrder.invoice_status === invoiceFilter;
-
-    const matchesPriority =
-      priorityFilter === 'all' || workOrder.priority_level === priorityFilter;
-
-    return matchesSearch && matchesStatus && matchesInvoice && matchesPriority;
+    return [
+      workOrder.work_order_number,
+      workOrder.customer_company_name,
+      workOrder.bill_to_company_name,
+      workOrder.customer_reference,
+      workOrder.pickup_reference,
+      workOrder.delivery_reference,
+      workOrder.pickup_company_name,
+      workOrder.delivery_company_name,
+      workOrder.special_instructions,
+      workOrder.internal_notes,
+      workOrder.billing_notes,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(lowerSearch);
   });
 
   const getActivePickupForWorkOrder = (workOrderId: string) => {
@@ -851,6 +826,99 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const handleDuplicateWorkOrder = async (workOrder: WorkOrder) => {
+    if (duplicatingId) return;
+
+    const ok = confirm(
+      `Duplicate ${workOrder.work_order_number}?\n\nThis will create a new work order with the same base information and freight lines.`,
+    );
+
+    if (!ok) return;
+
+    try {
+      setDuplicatingId(workOrder.id);
+
+      const { data: originalWorkOrder, error: workOrderError } = await supabase
+        .from('work_orders')
+        .select('*')
+        .eq('id', workOrder.id)
+        .single();
+
+      if (workOrderError) throw workOrderError;
+
+      const { id, created_at, updated_at, work_order_number, ...copyFields } =
+        (originalWorkOrder || {}) as Record<string, unknown>;
+
+      const duplicatePayload: Record<string, unknown> = {
+        ...copyFields,
+        work_order_number: '',
+        status: 'draft',
+        ready_to_invoice: false,
+        invoice_status: 'not_ready',
+        pod_received: false,
+        quickbooks_invoice_number: null,
+        quickbooks_invoice_id: null,
+      };
+
+      const { data: duplicatedWorkOrder, error: duplicateError } = await supabase
+        .from('work_orders')
+        .insert([duplicatePayload])
+        .select('*')
+        .single();
+
+      if (duplicateError) throw duplicateError;
+
+      const newWorkOrder = duplicatedWorkOrder as WorkOrder;
+
+      const { data: originalLines, error: lineLoadError } = await supabase
+        .from('work_order_line_items')
+        .select('*')
+        .eq('work_order_id', workOrder.id)
+        .order('line_number', { ascending: true });
+
+      if (lineLoadError) throw lineLoadError;
+
+      const copiedLines = ((originalLines || []) as Record<string, unknown>[]).map(
+        (line, index) => {
+          const { id, created_at, updated_at, work_order_id, ...lineFields } = line;
+
+          return {
+            ...lineFields,
+            work_order_id: newWorkOrder.id,
+            line_number: index + 1,
+          };
+        },
+      );
+
+      if (copiedLines.length > 0) {
+        const { error: lineInsertError } = await supabase
+          .from('work_order_line_items')
+          .insert(copiedLines);
+
+        if (lineInsertError) throw lineInsertError;
+      }
+
+      await loadPageData();
+
+      const href = getWorkOrderDetailHref(newWorkOrder);
+      window.open(href, '_blank');
+
+      // Keep the work order list as the active tab after opening the duplicate.
+      // Browsers ultimately control tab focus, but this prevents us from intentionally
+      // navigating away from the list page.
+      window.focus();
+    } catch (error) {
+      console.error('Error duplicating work order:', error);
+      alert(
+        error instanceof Error
+          ? `Could not duplicate work order.\n\n${error.message}`
+          : 'Could not duplicate work order.',
+      );
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
   const resetForm = () => {
     setFormData(emptyForm);
     setShowTimes(true);
@@ -875,59 +943,38 @@ export default function WorkOrdersPage() {
         subtitle="Condensed work order list. Click any work order row to open the full detailed file."
       />
 
-      <div className="page-actions">
-        <div className="page-actions-left">
-          <input
-            type="text"
-            placeholder="Search WO #, customer ref #, customer, pickup, delivery, notes..."
-            className="input-field max-w-xl"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Work Order Control
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {filteredWorkOrders.length} shown • {workOrders.length} total
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <input
+              type="text"
+              placeholder="Search WO, customer, PO/ref, shipper, receiver..."
+              className="input-field w-full lg:w-[420px]"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+
+            <a
+              href="/wo/new"
+              target="_blank"
+              
+              className="btn-primary flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <Plus className="h-5 w-5" />
+              Create Work Order
+            </a>
+          </div>
         </div>
-
-        <a
-          href="/wo/new"
-          target="_blank"
-          rel="noreferrer"
-          className="btn-primary flex items-center justify-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Create Work Order
-        </a>
-      </div>
-
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft dark:border-dark-border dark:bg-dark-card dark:shadow-soft-dark lg:grid-cols-3">
-        <FilterButtonGroup
-          label="Status"
-          value={statusFilter}
-          options={[
-            { value: 'active', label: 'Active' },
-            { value: 'all', label: 'All' },
-            ...workOrderStatusOptions,
-          ]}
-          onChange={(value) => setStatusFilter(value as 'active' | 'all' | WorkOrderStatus)}
-        />
-
-        <FilterButtonGroup
-          label="Priority"
-          value={priorityFilter}
-          options={[
-            { value: 'all', label: 'All' },
-            ...priorityOptions,
-          ]}
-          onChange={(value) => setPriorityFilter(value as 'all' | PriorityLevel)}
-        />
-
-        <FilterButtonGroup
-          label="Invoice"
-          value={invoiceFilter}
-          options={[
-            { value: 'all', label: 'All' },
-            ...invoiceStatusOptions,
-          ]}
-          onChange={(value) => setInvoiceFilter(value as 'all' | InvoiceStatus)}
-        />
       </div>
 
       {false && showForm && (
@@ -1387,20 +1434,24 @@ export default function WorkOrdersPage() {
           <table className="status-table">
             <thead>
               <tr>
-                <th>WO #</th>
-                <th>Customer / Refs</th>
-                <th>Pickup / Delivery</th>
+                <th>WO</th>
+                <th>Created</th>
+                <th>Customer / PO</th>
+                <th>Lane</th>
                 <th>Freight</th>
-                <th>Status</th>
                 <th>Pickup</th>
-                <th>Notes</th>
-                <th>Actions</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
 
             <tbody>
               {filteredWorkOrders.map((workOrder) => {
                 const activePickup = getActivePickupForWorkOrder(workOrder.id);
+                const hasImportantNotes = Boolean(
+                  workOrder.special_instructions ||
+                    workOrder.internal_notes ||
+                    workOrder.billing_notes
+                );
 
                 return (
                   <tr
@@ -1409,128 +1460,105 @@ export default function WorkOrdersPage() {
                     className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                     title="Click to open full work order details"
                   >
-                    <td>
-                      <p className="font-bold text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">
+                    <td className="align-top">
+                      <p className="whitespace-nowrap text-sm font-black text-blue-700 underline-offset-2 hover:underline dark:text-blue-300">
                         {workOrder.work_order_number}
                       </p>
 
-                      <p className="text-xs capitalize text-slate-600 dark:text-slate-400">
-                        {(workOrder.service_type || 'ltl').replaceAll('_', ' ')}
-                      </p>
-
-                      {workOrder.priority_level && workOrder.priority_level !== 'normal' && (
-                        <span
-                          className={`mt-1 inline-block rounded px-2 py-1 text-xs font-bold ${
-                            workOrder.priority_level === 'hot' ||
-                            workOrder.priority_level === 'urgent'
-                              ? 'bg-red-800 text-red-100'
-                              : 'bg-yellow-800 text-yellow-100'
-                          }`}
-                        >
-                          {String(workOrder.priority_level).toUpperCase()}
-                        </span>
-                      )}
-                    </td>
-
-                    <td>
-                      <p className="font-semibold text-slate-950 dark:text-white">
-                        {workOrder.customer_company_name || 'No customer'}
-                      </p>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        Bill To: {workOrder.bill_to_company_name || '—'}
-                      </p>
-
-                      {workOrder.customer_reference && (
-                        <p className="text-xs text-blue-300">
-                          Cust Ref: {workOrder.customer_reference}
-                        </p>
-                      )}
-
-                      {workOrder.pickup_reference && (
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                          PU Ref: {workOrder.pickup_reference}
-                        </p>
-                      )}
-
-                      {workOrder.delivery_reference && (
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                          DEL Ref: {workOrder.delivery_reference}
-                        </p>
-                      )}
-                    </td>
-
-                    <td>
-                      <p className="font-semibold text-slate-950 dark:text-white">
-                        PU: {workOrder.pickup_company_name || '—'}
-                      </p>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        {displayLocation(workOrder.pickup_address, workOrder.pickup_city)}
-                      </p>
-
-                      <p className="mt-2 font-semibold text-slate-950 dark:text-white">
-                        DEL: {workOrder.delivery_company_name || '—'}
-                      </p>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        {displayLocation(workOrder.delivery_address, workOrder.delivery_city)}
-                      </p>
-                    </td>
-
-                    <td>
-                      <p className="font-semibold text-slate-950 dark:text-white">
-                        {workOrder.number_of_skids ?? 'Unknown'} skids
-                      </p>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        {workOrder.weight_lbs
-                          ? `${Number(workOrder.weight_lbs).toLocaleString()} lbs`
-                          : 'Weight unknown'}
-                      </p>
-
-                      {workOrder.dimensions && (
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                          {workOrder.dimensions}
-                        </p>
-                      )}
-                    </td>
-
-                    <td>
-                      <div className="flex flex-wrap gap-1">
-                        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                          {(workOrder.status || 'open').replaceAll('_', ' ')}
-                        </span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {workOrder.ready_to_invoice && (
+                          <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                            Ready
+                          </span>
+                        )}
 
                         {workOrder.pod_received && (
-                          <span className="rounded bg-green-700 px-2 py-1 text-xs font-semibold text-white">
+                          <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-black uppercase text-green-800 dark:bg-green-900 dark:text-green-100">
                             POD
                           </span>
                         )}
 
-                        {workOrder.ready_to_invoice && (
-                          <span className="rounded bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
-                            READY
+                        {hasImportantNotes && (
+                          <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                            Notes
                           </span>
                         )}
-
-                        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                          {(workOrder.invoice_status || 'not_ready').replaceAll('_', ' ')}
-                        </span>
                       </div>
                     </td>
 
-                    <td>
+                    <td className="align-top">
+                      <p className="whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+                        {formatDate(workOrder.created_at)}
+                      </p>
+
+                      <p className="whitespace-nowrap text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {formatTime(workOrder.created_at)}
+                      </p>
+                    </td>
+
+                    <td className="align-top">
+                      <p className="font-bold text-slate-950 dark:text-white">
+                        {workOrder.bill_to_company_name ||
+                          workOrder.customer_company_name ||
+                          'No customer'}
+                      </p>
+
+                      {workOrder.customer_company_name &&
+                        workOrder.bill_to_company_name &&
+                        workOrder.customer_company_name !== workOrder.bill_to_company_name && (
+                          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Customer: {workOrder.customer_company_name}
+                          </p>
+                        )}
+
+                      {workOrder.customer_reference && (
+                        <p className="mt-1 inline-flex rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                          PO / Ref: {workOrder.customer_reference}
+                        </p>
+                      )}
+                    </td>
+
+                    <td className="align-top">
+                      <p className="text-sm font-semibold text-slate-950 dark:text-white">
+                        PU: {workOrder.pickup_company_name || '—'}
+                      </p>
+
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {workOrder.pickup_city || 'No city'}
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+                        DEL: {workOrder.delivery_company_name || '—'}
+                      </p>
+
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {workOrder.delivery_city || 'No city'}
+                      </p>
+                    </td>
+
+                    <td className="align-top">
+                      <p className="font-semibold text-slate-950 dark:text-white">
+                        {workOrder.number_of_skids ?? '—'} skids
+                      </p>
+
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {workOrder.weight_lbs
+                          ? `${Number(workOrder.weight_lbs).toLocaleString()} lbs`
+                          : 'Weight —'}
+                      </p>
+                    </td>
+
+                    <td className="align-top">
                       {activePickup ? (
                         <div>
-                          <span className="rounded bg-green-700 px-2 py-1 text-xs font-semibold text-white dark:bg-green-800 dark:text-green-100">
-                            Pickup Created
+                          <span className="rounded bg-green-100 px-2 py-1 text-xs font-black text-green-800 dark:bg-green-900 dark:text-green-100">
+                            Created
                           </span>
 
-                          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                          <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
                             {activePickup.assigned_truck_id
-                              ? 'Assigned to truck'
-                              : 'On pickup board'}
+                              ? 'Assigned'
+                              : 'On board'}
                           </p>
                         </div>
                       ) : (
@@ -1541,44 +1569,26 @@ export default function WorkOrdersPage() {
                             handleCreatePickupFromWorkOrder(workOrder);
                           }}
                           disabled={creatingPickupId === workOrder.id}
-                          className="rounded bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
                           title="Create pickup from this work order"
                         >
                           <PackagePlus className="mr-1 inline h-3.5 w-3.5" />
                           {creatingPickupId === workOrder.id
                             ? 'Creating...'
-                            : 'Create Pickup'}
+                            : 'Create'}
                         </button>
                       )}
                     </td>
 
-                    <td>
-                      <p className="max-w-xs text-xs text-yellow-300">
-                        {workOrder.special_instructions || '—'}
-                      </p>
-
-                      {workOrder.internal_notes && (
-                        <p className="mt-1 max-w-xs text-xs text-purple-300">
-                          Internal: {workOrder.internal_notes}
-                        </p>
-                      )}
-
-                      {workOrder.billing_notes && (
-                        <p className="mt-1 max-w-xs text-xs text-blue-300">
-                          Billing: {workOrder.billing_notes}
-                        </p>
-                      )}
-                    </td>
-
-                    <td>
-                      <div className="flex gap-2">
+                    <td className="align-top">
+                      <div className="flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             openWorkOrderDetail(workOrder);
                           }}
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-dark-border dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                           title="Open full work order details"
                         >
                           Open
@@ -1588,12 +1598,14 @@ export default function WorkOrdersPage() {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            handleEdit(workOrder);
+                            handleDuplicateWorkOrder(workOrder);
                           }}
-                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                          title="Edit work order"
+                          disabled={duplicatingId === workOrder.id}
+                          className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950"
+                          title="Duplicate this work order"
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Copy className="mr-1 inline h-3.5 w-3.5" />
+                          {duplicatingId === workOrder.id ? 'Copying...' : 'Duplicate'}
                         </button>
 
                         <button
@@ -1603,10 +1615,10 @@ export default function WorkOrdersPage() {
                             handleDelete(workOrder);
                           }}
                           disabled={deletingId === workOrder.id}
-                          className="text-red-400 hover:text-red-300 disabled:opacity-50"
+                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950"
                           title="Delete work order"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -1621,6 +1633,34 @@ export default function WorkOrdersPage() {
   );
 }
 
+
+
+function formatDate(value?: string | null) {
+  if (!value) return '—';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return '';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 function getWorkOrderDetailHref(workOrder: WorkOrder) {
   const numberOrId = workOrder.work_order_number || workOrder.id;

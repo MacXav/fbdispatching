@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import MainLayout from "@/components/MainLayout";
 import { supabase } from "@/lib/supabase";
 import {
   AlertTriangle,
   ArrowLeft,
+  CalendarDays,
+  Copy,
   ExternalLink,
   FileText,
   Loader2,
@@ -204,6 +205,7 @@ export default function WorkOrderBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(isNew);
   const [notFound, setNotFound] = useState(false);
+  const [bolPrintTarget, setBolPrintTarget] = useState<string>("all");
 
   useEffect(() => {
     loadReferenceLists();
@@ -220,6 +222,12 @@ export default function WorkOrderBuilderPage() {
     loadExistingWorkOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderNumber]);
+
+  useEffect(() => {
+    if (bolPrintTarget !== "all" && Number(bolPrintTarget) >= lines.length) {
+      setBolPrintTarget("all");
+    }
+  }, [bolPrintTarget, lines.length]);
 
   useEffect(() => {
     const refreshReferenceData = () => {
@@ -381,6 +389,21 @@ export default function WorkOrderBuilderPage() {
 
   const totals = useMemo(() => calculateTotals(lines), [lines]);
 
+  const selectedBolLineIndex =
+    bolPrintTarget === "all" ? null : Number(bolPrintTarget);
+
+  const printableBolLines = useMemo(() => {
+    if (selectedBolLineIndex === null || Number.isNaN(selectedBolLineIndex)) {
+      return lines;
+    }
+
+    return lines[selectedBolLineIndex] ? [lines[selectedBolLineIndex]] : lines;
+  }, [lines, selectedBolLineIndex]);
+
+  const printableBolTotals = useMemo(() => {
+    return calculateTotals(printableBolLines);
+  }, [printableBolLines]);
+
   const rankedCustomsBrokers = useMemo(() => {
     const firstLine = lines[0] || createBlankLine(1);
 
@@ -421,6 +444,29 @@ export default function WorkOrderBuilderPage() {
 
   const addLine = () => {
     setLines((current) => [...current, createBlankLine(current.length + 1)]);
+  };
+
+  const duplicateLine = (index: number) => {
+    setLines((current) => {
+      const sourceLine = current[index];
+
+      if (!sourceLine) return current;
+
+      const duplicatedLine: LineDraft = {
+        ...sourceLine,
+        id: undefined,
+        line_number: index + 2,
+      };
+
+      return [
+        ...current.slice(0, index + 1),
+        duplicatedLine,
+        ...current.slice(index + 1),
+      ].map((line, lineIndex) => ({
+        ...line,
+        line_number: lineIndex + 1,
+      }));
+    });
   };
 
   const removeLine = (index: number) => {
@@ -663,16 +709,31 @@ export default function WorkOrderBuilderPage() {
   };
 
   const closeTab = () => {
-    if (typeof window === "undefined") return;
-    window.close();
-    window.setTimeout(() => {
-      if (!window.closed) router.push("/work-orders");
-    }, 150);
+    const fallbackHref = '/work-orders';
+
+    try {
+      // When this page is opened from /work-orders without noopener,
+      // focus the original list tab first so closing this tab returns the user there.
+      if (window.opener && !window.opener.closed) {
+        window.opener.focus();
+      }
+
+      window.close();
+
+      // Some browsers block window.close() if the tab was not opened by script/link.
+      window.setTimeout(() => {
+        if (!document.hidden) {
+          window.location.href = fallbackHref;
+        }
+      }, 250);
+    } catch (error) {
+      window.location.href = fallbackHref;
+    }
   };
 
   if (loading) {
     return (
-      <MainLayout>
+      <div className="h-screen overflow-hidden bg-slate-100 text-slate-950 dark:bg-dark-bg dark:text-slate-100">
         <div className="flex h-full items-center justify-center">
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-soft dark:border-dark-border dark:bg-dark-card">
             <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-blue-700 dark:text-blue-300" />
@@ -681,13 +742,13 @@ export default function WorkOrderBuilderPage() {
             </p>
           </div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   if (notFound) {
     return (
-      <MainLayout>
+      <div className="h-screen overflow-hidden bg-slate-100 text-slate-950 dark:bg-dark-bg dark:text-slate-100">
         <div className="flex h-full items-center justify-center">
           <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-soft dark:border-dark-border dark:bg-dark-card">
             <h1 className="text-2xl font-black text-slate-950 dark:text-white">
@@ -706,7 +767,7 @@ export default function WorkOrderBuilderPage() {
             </button>
           </div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
@@ -715,7 +776,7 @@ export default function WorkOrderBuilderPage() {
     : workOrder?.work_order_number || workOrderNumber;
 
   return (
-    <MainLayout>
+    <div className="h-screen overflow-hidden bg-slate-100 text-slate-950 dark:bg-dark-bg dark:text-slate-100">
       <style jsx global>{`
         @media print {
           body {
@@ -803,21 +864,40 @@ export default function WorkOrderBuilderPage() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="btn-secondary h-9 gap-2 px-3 text-sm"
-            >
-              <Printer className="h-4 w-4" />
-              BOL
-            </button>
+            <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 dark:border-dark-border dark:bg-slate-900">
+              <select
+                value={bolPrintTarget}
+                onChange={(event) => setBolPrintTarget(event.target.value)}
+                className="h-7 max-w-[170px] rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                title="Choose which BOL to print"
+              >
+                <option value="all">Print all lines</option>
+                {lines.map((line, index) => (
+                  <option key={line.id || `bol-option-${index}`} value={String(index)}>
+                    {formatBolPrintOption(line, index)}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex h-7 items-center gap-1 rounded-md bg-blue-600 px-2 text-xs font-black text-white transition hover:bg-blue-700"
+              >
+                <Printer className="h-4 w-4" />
+                BOL
+              </button>
+            </div>
 
             <button
               type="button"
               onClick={closeTab}
-              className="btn-secondary h-9 px-3 text-sm"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border-2 border-red-300 bg-red-50 px-3 text-sm font-black text-red-700 shadow-sm transition hover:border-red-500 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-950"
+              title="Close this work order tab"
+              aria-label="Close this work order tab"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
+              Close
             </button>
           </div>
         </div>
@@ -879,7 +959,7 @@ export default function WorkOrderBuilderPage() {
                 }
               />
               <CompactInput
-                label="Customer Ref"
+                label="PO / Accounting Ref"
                 value={baseForm.customer_reference}
                 disabled={!editing}
                 onChange={(value) => updateBase("customer_reference", value)}
@@ -952,38 +1032,69 @@ export default function WorkOrderBuilderPage() {
                     Create/print the BOL directly from this work order.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="btn-secondary h-8 gap-2 px-3 text-xs"
-                >
-                  <Printer className="h-4 w-4" />
-                  Print BOL
-                </button>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={bolPrintTarget}
+                    onChange={(event) => setBolPrintTarget(event.target.value)}
+                    className="h-8 max-w-[190px] rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    title="Choose which BOL to print"
+                  >
+                    <option value="all">Print all lines</option>
+                    {lines.map((line, index) => (
+                      <option key={line.id || `bol-card-option-${index}`} value={String(index)}>
+                        {formatBolPrintOption(line, index)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="btn-secondary h-8 gap-2 px-3 text-xs"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print BOL
+                  </button>
+                </div>
               </div>
             </div>
           </section>
 
           <section className="col-span-12 flex min-h-0 flex-col rounded-2xl border border-slate-300 bg-white shadow-soft dark:border-dark-border dark:bg-dark-card xl:col-span-8">
-            <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-slate-200 p-3 dark:border-dark-border">
+            <div className="flex flex-shrink-0 flex-col gap-3 border-b border-slate-200 p-3 dark:border-dark-border md:flex-row md:items-center md:justify-between">
               <SectionTitle
                 title="Freight Lines"
-                subtitle="Line 1 is required. Shipper and receiver are required. Price can be added later by accounting."
+                subtitle="Freight lines. Add as many as needed; price can be added later."
               />
+
               {editing && (
-                <button
-                  type="button"
-                  onClick={addLine}
-                  className="btn-primary h-8 gap-1 px-3 text-xs"
-                >
-                  <Plus className="h-4 w-4" />
-                  Line
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="btn-primary h-8 gap-1 px-3 text-xs"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Line
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="custom-board-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
-              <div className="space-y-2">
+            <div className="hidden grid-cols-[28px_minmax(88px,1.25fr)_minmax(88px,1.25fr)_48px_58px_minmax(82px,1fr)_58px_66px_48px] gap-1 border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-700 dark:border-dark-border dark:bg-slate-900 dark:text-slate-300 xl:grid">
+              <span>#</span>
+              <span>Shipper</span>
+              <span>Receiver</span>
+              <span>Pieces</span>
+              <span>Type</span>
+              <span>Commodity</span>
+              <span>Weight</span>
+              <span>Price</span>
+              <span>Actions</span>
+            </div>
+
+            <div className="custom-board-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2">
+              <div className="space-y-1.5">
                 {lines.map((line, index) => (
                   <LineEditor
                     key={line.id || `line-${index}`}
@@ -995,6 +1106,7 @@ export default function WorkOrderBuilderPage() {
                     onCompany={(side, value) =>
                       applyCompanyToLine(index, side, value)
                     }
+                    onDuplicate={() => duplicateLine(index)}
                     onRemove={() => removeLine(index)}
                     canRemove={lines.length > 1}
                     currency={baseForm.currency}
@@ -1027,11 +1139,12 @@ export default function WorkOrderBuilderPage() {
         <PrintableWorkOrderBol
           workOrderNumber={titleNumber}
           baseForm={baseForm}
-          lines={lines}
-          totals={totals}
+          lines={printableBolLines}
+          totals={printableBolTotals}
+          selectedLineIndex={selectedBolLineIndex}
         />
       </div>
-    </MainLayout>
+    </div>
   );
 }
 
@@ -1040,13 +1153,16 @@ function PrintableWorkOrderBol({
   baseForm,
   lines,
   totals,
+  selectedLineIndex,
 }: {
   workOrderNumber: string;
   baseForm: BaseForm;
   lines: LineDraft[];
   totals: { totalPieces: number; totalWeight: number; totalPrice: number };
+  selectedLineIndex: number | null;
 }) {
   const today = new Date().toLocaleDateString();
+  const bolScopeLabel = selectedLineIndex === null ? "All Lines" : `Line ${selectedLineIndex + 1}`;
 
   return (
     <div className="wo-bol-page bg-white p-4 text-black">
@@ -1061,6 +1177,7 @@ function PrintableWorkOrderBol({
         </div>
         <div className="text-right text-xs font-bold">
           <p>WO: {workOrderNumber}</p>
+          <p>BOL: {bolScopeLabel}</p>
           <p>Date: {today}</p>
         </div>
       </div>
@@ -1076,7 +1193,7 @@ function PrintableWorkOrderBol({
           value={baseForm.customs_broker_company_name || "N/A"}
         />
         <PrintBox
-          title="Customer Reference"
+          title="PO / Accounting Reference"
           value={baseForm.customer_reference || "N/A"}
         />
         <PrintBox title="Pickup Date" value={baseForm.pickup_date || "N/A"} />
@@ -1106,7 +1223,7 @@ function PrintableWorkOrderBol({
           {lines.map((line, index) => (
             <tr key={line.id || index}>
               <td className="border border-black px-1 py-1 font-bold">
-                {index + 1}
+                {selectedLineIndex === null ? index + 1 : selectedLineIndex + 1}
               </td>
               <td className="border border-black px-1 py-1">
                 <p className="font-bold">{displayValue(line.shipper)}</p>
@@ -1157,6 +1274,14 @@ function PrintableWorkOrderBol({
   );
 }
 
+
+function formatBolPrintOption(line: LineDraft, index: number) {
+  const shipper = line.shipper?.trim() || "Shipper";
+  const receiver = line.receiver?.trim() || "Receiver";
+
+  return `Line ${index + 1}: ${shipper} → ${receiver}`;
+}
+
 function PrintBox({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="border border-black p-2">
@@ -1173,6 +1298,7 @@ function LineEditor({
   companies,
   onUpdate,
   onCompany,
+  onDuplicate,
   onRemove,
   canRemove,
   currency,
@@ -1183,6 +1309,7 @@ function LineEditor({
   companies: CompanyOption[];
   onUpdate: (field: keyof LineDraft, value: string) => void;
   onCompany: (side: "shipper" | "receiver", value: string) => void;
+  onDuplicate: () => void;
   onRemove: () => void;
   canRemove: boolean;
   currency: Currency;
@@ -1192,34 +1319,32 @@ function LineEditor({
       ? `${displayValue(line.shipper)} → ${displayValue(line.receiver)}`
       : `Line ${index + 1}`;
 
+  const rowTone =
+    index % 2 === 0
+      ? "bg-white dark:bg-slate-900/70"
+      : "bg-slate-50 dark:bg-slate-950/60";
+
   return (
-    <div className="rounded-xl border-2 border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/70">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
-            Line {index + 1}: {lineTitle}
-          </p>
-          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-            {formatMoney(numberOrZero(line.price), currency)} •{" "}
-            {displayValue(line.piece_count, "0")}{" "}
-            {displayValue(line.piece_type, "pieces")} •{" "}
-            {displayValue(line.commodity, "Commodity required")}
+    <div
+      className={`rounded-lg border border-slate-300 ${rowTone} p-1 shadow-sm dark:border-slate-700 xl:p-1`}
+    >
+      <div className="grid min-w-0 grid-cols-12 items-end gap-1 xl:grid-cols-[28px_minmax(88px,1.25fr)_minmax(88px,1.25fr)_48px_58px_minmax(82px,1fr)_58px_66px_48px]">
+        <div className="col-span-12 flex items-center justify-between gap-2 xl:col-span-1 xl:block">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400 xl:hidden">
+              Line
+            </p>
+            <p className="text-sm font-black text-slate-950 dark:text-white">
+              {index + 1}
+            </p>
+          </div>
+
+          <p className="min-w-0 flex-1 truncate text-right text-xs font-bold text-slate-700 dark:text-slate-300 xl:hidden">
+            {lineTitle}
           </p>
         </div>
 
-        {editing && canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-lg border border-red-300 bg-red-50 p-2 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-12 gap-2">
-        <div className="col-span-12 md:col-span-3">
+        <div className="col-span-12 min-w-0 sm:col-span-6 xl:col-span-1">
           <CompanyField
             label="Shipper *"
             value={line.shipper}
@@ -1228,15 +1353,8 @@ function LineEditor({
             onChange={(value) => onCompany("shipper", value)}
           />
         </div>
-        <div className="col-span-6 md:col-span-2">
-          <CompactInput
-            label="PU City"
-            value={line.shipper_city}
-            disabled={!editing}
-            onChange={(value) => onUpdate("shipper_city", value)}
-          />
-        </div>
-        <div className="col-span-12 md:col-span-3">
+
+        <div className="col-span-12 min-w-0 sm:col-span-6 xl:col-span-1">
           <CompanyField
             label="Receiver *"
             value={line.receiver}
@@ -1245,15 +1363,8 @@ function LineEditor({
             onChange={(value) => onCompany("receiver", value)}
           />
         </div>
-        <div className="col-span-6 md:col-span-2">
-          <CompactInput
-            label="DEL City"
-            value={line.receiver_city}
-            disabled={!editing}
-            onChange={(value) => onUpdate("receiver_city", value)}
-          />
-        </div>
-        <div className="col-span-6 md:col-span-1">
+
+        <div className="col-span-6 min-w-0 sm:col-span-3 xl:col-span-1">
           <CompactInput
             label="Pieces"
             value={line.piece_count}
@@ -1262,7 +1373,8 @@ function LineEditor({
             onChange={(value) => onUpdate("piece_count", value)}
           />
         </div>
-        <div className="col-span-6 md:col-span-1">
+
+        <div className="col-span-6 min-w-0 sm:col-span-3 xl:col-span-1">
           <CompactSelect
             label="Type"
             value={line.piece_type}
@@ -1280,7 +1392,8 @@ function LineEditor({
             ]}
           />
         </div>
-        <div className="col-span-12 md:col-span-4">
+
+        <div className="col-span-12 min-w-0 sm:col-span-6 xl:col-span-1">
           <CompactInput
             label="Commodity"
             value={line.commodity}
@@ -1288,16 +1401,18 @@ function LineEditor({
             onChange={(value) => onUpdate("commodity", value)}
           />
         </div>
-        <div className="col-span-6 md:col-span-2">
+
+        <div className="col-span-6 min-w-0 sm:col-span-3 xl:col-span-1">
           <CompactInput
-            label="Weight lb"
+            label="Weight"
             value={line.weight_lbs}
             type="number"
             disabled={!editing}
             onChange={(value) => onUpdate("weight_lbs", value)}
           />
         </div>
-        <div className="col-span-6 md:col-span-2">
+
+        <div className="col-span-6 min-w-0 sm:col-span-3 xl:col-span-1">
           <CompactInput
             label={`Price ${currency}`}
             value={line.price}
@@ -1306,7 +1421,52 @@ function LineEditor({
             onChange={(value) => onUpdate("price", value)}
           />
         </div>
-        <div className="col-span-12 md:col-span-4">
+
+        <div className="col-span-12 flex min-w-0 items-end gap-1 xl:col-span-1">
+          {editing && (
+            <button
+              type="button"
+              onClick={onDuplicate}
+              className="flex h-7 flex-1 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 xl:flex-none xl:px-1.5"
+              title="Duplicate this line"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          {editing && canRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="flex h-7 flex-1 items-center justify-center rounded-md border border-red-300 bg-red-50 text-red-700 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950 xl:flex-none xl:px-1.5"
+              title="Remove this line"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-1 grid grid-cols-12 gap-1 border-t border-slate-200 pt-1 dark:border-slate-800">
+        <div className="col-span-6 md:col-span-2">
+          <CompactInput
+            label="PU City"
+            value={line.shipper_city}
+            disabled={!editing}
+            onChange={(value) => onUpdate("shipper_city", value)}
+          />
+        </div>
+
+        <div className="col-span-6 md:col-span-2">
+          <CompactInput
+            label="DEL City"
+            value={line.receiver_city}
+            disabled={!editing}
+            onChange={(value) => onUpdate("receiver_city", value)}
+          />
+        </div>
+
+        <div className="col-span-12 md:col-span-8">
           <CompactInput
             label="Line Notes"
             value={line.notes}
@@ -1351,18 +1511,58 @@ function CompactInput({
   disabled?: boolean;
   type?: string;
 }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isDate = type === "date";
+
+  const openDatePicker = () => {
+    if (!isDate || disabled) return;
+
+    const input = inputRef.current;
+
+    if (!input) return;
+
+    input.focus();
+
+    try {
+      input.showPicker?.();
+    } catch {
+      // Some browsers/extensions block showPicker. Focusing the field still lets
+      // the native date input work without crashing the page.
+    }
+  };
+
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
+      <span className="mb-0.5 block text-[9px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
         {label}
       </span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300"
-      />
+
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onClick={openDatePicker}
+          disabled={disabled}
+          className={`h-7 min-w-0 w-full rounded-md border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300 ${
+            isDate ? "pr-11" : ""
+          }`}
+        />
+
+        {isDate && (
+          <button
+            type="button"
+            onClick={openDatePicker}
+            disabled={disabled}
+            className="absolute right-1 top-1/2 flex h-7 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-slate-800 shadow-sm transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            title={`Open ${label} calendar`}
+            aria-label={`Open ${label} calendar`}
+          >
+            <CalendarDays className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </label>
   );
 }
@@ -1382,14 +1582,14 @@ function CompactSelect({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
+      <span className="mb-0.5 block text-[9px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300"
+        className="h-7 min-w-0 w-full rounded-md border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -1506,6 +1706,26 @@ function SearchPickerField({
     if (!open) setQuery(value);
   }, [open, value]);
 
+  const autofillMatch = useMemo(() => {
+    return findAutofillOption(value, options);
+  }, [options, value]);
+
+  const autofillPreview = useMemo(() => {
+    if (!autofillMatch || disabled) return "";
+    return getAutofillPreviewSuffix(value, autofillMatch.name);
+  }, [autofillMatch, disabled, value]);
+
+  const applyAutofillMatch = () => {
+    if (disabled || !autofillMatch) return;
+
+    const typedKey = normalizeKey(value);
+    const matchKey = normalizeKey(autofillMatch.name);
+
+    if (typedKey && matchKey && autofillMatch.name !== value) {
+      onChange(autofillMatch.name);
+    }
+  };
+
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizeKey(query || value);
 
@@ -1547,18 +1767,35 @@ function SearchPickerField({
   return (
     <div className="relative">
       <label className="block">
-        <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
+        <span className="mb-0.5 block text-[9px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">
           {label}
         </span>
 
-        <div className="flex h-9 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950">
-          <input
-            value={value}
-            placeholder={placeholder}
-            onChange={(event) => onChange(event.target.value)}
-            disabled={disabled}
-            className="min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-slate-950 outline-none disabled:bg-slate-100 disabled:text-slate-700 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300"
-          />
+        <div className="flex h-7 min-w-0 overflow-hidden rounded-md border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950">
+          <div className="relative min-w-0 flex-1">
+            {autofillPreview && (
+              <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex min-w-0 items-center overflow-hidden px-1 text-[11px] font-semibold">
+                <span className="invisible whitespace-pre">{value}</span>
+                <span className="truncate text-slate-400 dark:text-slate-500">
+                  {autofillPreview}
+                </span>
+              </div>
+            )}
+
+            <input
+              value={value}
+              placeholder={placeholder}
+              onChange={(event) => onChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Tab" && autofillMatch && autofillMatch.name !== value) {
+                  event.preventDefault();
+                  applyAutofillMatch();
+                }
+              }}
+              disabled={disabled}
+              className="relative z-10 min-w-0 w-full bg-transparent px-1 text-[11px] font-semibold text-slate-950 outline-none disabled:bg-slate-100 disabled:text-slate-700 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-300"
+            />
+          </div>
 
           <button
             type="button"
@@ -1566,13 +1803,19 @@ function SearchPickerField({
               if (!disabled) setOpen(true);
             }}
             disabled={disabled}
-            className="flex w-9 flex-shrink-0 items-center justify-center border-l border-slate-300 bg-slate-50 text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex w-8 flex-shrink-0 items-center justify-center border-l border-slate-300 bg-slate-50 text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             title={`Search ${label.replace(" *", "")}`}
           >
             <Search className="h-4 w-4" />
           </button>
         </div>
       </label>
+
+      {autofillMatch && !disabled && autofillMatch.name !== value && (
+        <p className="mt-1 block max-w-full truncate text-left text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+          Preview: {autofillMatch.name} <span className="text-slate-500 dark:text-slate-400">— press Tab to autofill</span>
+        </p>
+      )}
 
       {helper && !disabled && (
         <button
@@ -1672,6 +1915,57 @@ function SearchPickerField({
   );
 }
 
+function getAutofillPreviewSuffix(value: string, matchName: string) {
+  const typed = value || "";
+
+  if (!typed.trim()) {
+    return "";
+  }
+
+  if (matchName === typed) {
+    return "";
+  }
+
+  if (matchName.toLowerCase().startsWith(typed.toLowerCase())) {
+    return matchName.slice(typed.length);
+  }
+
+  return ` → ${matchName}`;
+}
+
+function findAutofillOption(
+  value: string,
+  options: SearchPickerOption[],
+): SearchPickerOption | null {
+  const typedKey = normalizeKey(value);
+
+  if (typedKey.length < 3) {
+    return null;
+  }
+
+  const exactMatches = options.filter(
+    (option) => normalizeKey(option.name) === typedKey,
+  );
+
+  if (exactMatches.length === 1) {
+    return exactMatches[0];
+  }
+
+  const strongMatches = options.filter((option) => {
+    const optionKey = normalizeKey(option.name);
+
+    if (!optionKey) return false;
+
+    return optionKey.startsWith(typedKey) || typedKey.startsWith(optionKey);
+  });
+
+  if (strongMatches.length === 1) {
+    return strongMatches[0];
+  }
+
+  return null;
+}
+
 function IncompleteReferencesBanner({
   references,
 }: {
@@ -1705,14 +1999,6 @@ function IncompleteReferencesBanner({
           className="rounded-lg border border-amber-400 bg-white px-3 py-1 text-xs font-black uppercase tracking-wide text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900"
         >
           Fix First
-        </a>
-        <a
-          href="/records-needing-details"
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-amber-900 hover:bg-amber-200 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-100 dark:hover:bg-amber-900"
-        >
-          All
         </a>
       </div>
     </div>

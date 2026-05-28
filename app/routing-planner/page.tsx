@@ -402,7 +402,7 @@ export default function RoutingPlannerPage() {
       <MainLayout>
         <Header
           title="Routing Planner"
-          subtitle="Clean truck grouping for Freightboy Warehouse, Buffalo, and regular deliveries"
+          subtitle="Cross-dock planning and tomorrow delivery truck assignments"
         />
 
         <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-10 text-center">
@@ -417,10 +417,41 @@ export default function RoutingPlannerPage() {
     <MainLayout>
       <Header
         title="Routing Planner"
-        subtitle="Build cleaner truck routes with fewer mixed loads and clearer dock moves"
+        subtitle="Cross-dock planning: decide what freight goes on what delivery truck tomorrow"
       />
 
       <div className="space-y-5">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-900 dark:bg-amber-950/30">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                End-of-day / morning cross-dock workflow
+              </p>
+
+              <p className="mt-1 text-sm font-semibold leading-6 text-amber-950 dark:text-amber-100">
+                This page is for freight that has been picked up and brought back to the yard. Use it to decide which truck should deliver each shipment tomorrow.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 text-xs font-black text-amber-950 dark:text-amber-100 sm:grid-cols-4 xl:min-w-[680px]">
+              <div className="rounded-xl border border-amber-300 bg-white px-3 py-2 dark:border-amber-800 dark:bg-amber-950/50">
+                1. Picked up
+              </div>
+
+              <div className="rounded-xl border border-amber-300 bg-white px-3 py-2 dark:border-amber-800 dark:bg-amber-950/50">
+                2. At yard
+              </div>
+
+              <div className="rounded-xl border border-amber-300 bg-white px-3 py-2 dark:border-amber-800 dark:bg-amber-950/50">
+                3. Plan truck
+              </div>
+
+              <div className="rounded-xl border border-amber-300 bg-white px-3 py-2 dark:border-amber-800 dark:bg-amber-950/50">
+                4. Morning sort
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-5 shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -431,10 +462,10 @@ export default function RoutingPlannerPage() {
 
                 <div>
                   <h2 className="text-xl font-black text-slate-950 dark:text-white">
-                    Route bucket planner
+                    Cross-dock routing planner
                   </h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Freightboy Warehouse stays together. Buffalo stays together. Everything else fills in after.
+                    Use this after pickups return to the yard. Group freight by delivery area, then apply the planned delivery truck assignments for the morning cross-dock.
                   </p>
                 </div>
               </div>
@@ -476,13 +507,13 @@ export default function RoutingPlannerPage() {
                 disabled={loading || analyzing || applying || geocodingDeliveries}
               >
                 <Shuffle className="h-4 w-4" />
-                {analyzing ? 'Analyzing...' : 'Analyze Routes'}
+                {analyzing ? 'Analyzing...' : 'Build Suggested Plan'}
               </button>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <SummaryBox label="Freight" value={String(activeAssignedFreight.length)} />
+            <SummaryBox label="At Yard / Assigned" value={String(activeAssignedFreight.length)} />
             <SummaryBox label="GPS Ready" value={String(assignedWithGpsCount)} />
             <SummaryBox label="Need GPS" value={String(shipmentsNeedingDeliveryGps.length)} />
             <SummaryBox label="Trucks" value={String(activeTrucks.length)} />

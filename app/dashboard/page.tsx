@@ -252,10 +252,13 @@ export default function Dashboard() {
         };
       });
 
+      const todayDateKey = getTodayDateKey();
+
       const pickups = shipmentsData
         .filter((shipment) => !shipment.assigned_truck_id)
         .filter((shipment) => shipment.status === 'pending')
         .filter((shipment) => shipment.dispatch_task_type !== 'board_stop')
+        .filter((shipment) => shouldShowOnTodayPickupBoard(shipment, todayDateKey))
         .sort(sortShipmentsForBoard);
 
       setTruckColumns(columns);
@@ -2562,7 +2565,7 @@ function EmptyTruckRows({ count }: { count: number }) {
         >
           <div className="border-r border-slate-200 dark:border-slate-800" />
           <div className="border-r border-slate-200 dark:border-slate-800 px-1 py-1">
-            {index === 0 ? 'Drop at bottom' : ''}
+            
           </div>
           <div />
         </div>
@@ -2581,7 +2584,7 @@ function EmptyPickupRows({ count }: { count: number }) {
         >
           <div className="border-r border-slate-200 dark:border-slate-800" />
           <div className="border-r border-slate-200 dark:border-slate-800 px-1 py-1">
-            {index === 0 ? 'Drop at bottom' : ''}
+            
           </div>
           <div className="border-r border-slate-200 dark:border-slate-800" />
           <div className="border-r border-slate-200 dark:border-slate-800" />
@@ -2625,6 +2628,33 @@ function getRowDropPosition(
   const midpoint = rectangle.top + rectangle.height / 2;
 
   return clientY < midpoint ? 'before' : 'after';
+}
+
+function getTodayDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDateKey(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function shouldShowOnTodayPickupBoard(shipment: Shipment, todayDateKey: string) {
+  const pickupDateKey = getDateKey(shipment.pickup_date);
+
+  if (!pickupDateKey) {
+    return false;
+  }
+
+  return pickupDateKey <= todayDateKey;
 }
 
 function sortShipmentsForBoard(a: Shipment, b: Shipment) {

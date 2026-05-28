@@ -86,21 +86,15 @@ export default function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
         },
         {
           href: "/routes",
-          label: "Routes",
+          label: "Driver Routes",
           icon: Navigation2,
           match: ["/routes"],
         },
         {
           href: "/routing-planner",
-          label: "Planner",
+          label: "Routing Planner",
           icon: Route,
           match: ["/routing-planner"],
-        },
-        {
-          href: "/cross-dock",
-          label: "Cross-Dock",
-          icon: Layers,
-          match: ["/cross-dock"],
         },
       ],
     },
